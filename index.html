@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quantization Options in Early-Stage Ranking (ESR)</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Ambient background glows -->
+  <div class="glow-container">
+    <div class="glow-orb glow-orb-1"></div>
+    <div class="glow-orb glow-orb-2"></div>
+  </div>
+
+  <div class="presentation-container">
+    <!-- Header -->
+    <header>
+      <div class="logo-section">
+        <div class="logo-icon">Q</div>
+        <div class="logo-text">Quantization<span>ESR</span></div>
+      </div>
+      <div class="progress-container">
+        <div class="progress-bar-bg">
+          <div class="progress-bar-fill"></div>
+        </div>
+        <div class="progress-text">1 / 9</div>
+      </div>
+    </header>
+
+    <!-- Slides Wrapper -->
+    <main class="slides-wrapper">
+
+      <!-- SLIDE 1: Title -->
+      <section class="slide active" id="slide-1">
+        <div class="slide-title-layout">
+          <span class="slide-tag">GPU Serving Optimization</span>
+          <h1>Quantization Options in<br>Early-Stage Ranking (ESR)</h1>
+          <p>Strategies for compressing massive object towers into GPU memory for real-time recommender systems.</p>
+          <div class="author">
+            Use <span class="key-cap">→</span> or <span class="key-cap">Space</span> to navigate. Click widgets to interact.
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 2: Context / The Problem -->
+      <section class="slide" id="slide-2">
+        <div class="slide-header">
+          <span class="slide-tag">01. Serving Bottleneck</span>
+          <h2>Moving ESR to GPU Serving</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <p>In modern two-tower recommender stacks, the <strong>Early Stage Ranking (ESR)</strong> filters billions of candidate items down to thousands before the Late Stage Ranker (LSR) processes them. To maximize throughput and capture complex cross-features, serving is shifted to GPUs.</p>
+            <div class="info-badge">The Architecture</div>
+            <p>During training, the user tower is modeled with <code>U × D</code> embeddings and the object tower maps objects to <code>O × D</code> embeddings. Training utilizes the same user-impressed data as LSR. However, serving constraints differ drastically:</p>
+            <ul class="feature-list">
+              <li><strong>User Tower:</strong> Inferred on-the-fly using the user's real-time context.</li>
+              <li><strong>Object Tower:</strong> Pre-computed offline. All object embeddings (often millions of items) must be pre-loaded into GPU High Bandwidth Memory (HBM) for sub-millisecond similarity lookups.</li>
+              <li><strong>The Bottleneck:</strong> GPU memory is highly constrained. A vocabulary of 10 million items at 128 dimensions in BF16 requires 2.56 GB of raw HBM, excluding index structures, model weights, and search libraries (e.g. FAISS).</li>
+            </ul>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">Interactive GPU Memory Calculator</span>
+              </div>
+              <div class="panel-content">
+                <div class="calc-inputs">
+                  <div class="input-group">
+                    <label for="calc-vocab">Vocab Size (O)</label>
+                    <input type="number" id="calc-vocab" class="input-field" value="10000000" step="1000000">
+                  </div>
+                  <div class="input-group">
+                    <label for="calc-dim">Dimension (D)</label>
+                    <input type="number" id="calc-dim" class="input-field" value="128" step="32">
+                  </div>
+                </div>
+                <div class="calc-bars">
+                  <div class="bar-row">
+                    <div class="bar-labels">
+                      <span class="bar-label-type">FP32 (4 Bytes/float)</span>
+                      <span class="bar-label-val" id="val-fp32">5.12 GB</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill fp32" id="bar-fp32"></div></div>
+                  </div>
+                  <div class="bar-row">
+                    <div class="bar-labels">
+                      <span class="bar-label-type">BF16 / FP16 (2 Bytes/float)</span>
+                      <span class="bar-label-val" id="val-fp16">2.56 GB</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill fp16" id="bar-fp16"></div></div>
+                  </div>
+                  <div class="bar-row">
+                    <div class="bar-labels">
+                      <span class="bar-label-type">INT8 Scalar (1 Byte/int)</span>
+                      <span class="bar-label-val" id="val-int8">1.28 GB</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill int8" id="bar-int8"></div></div>
+                  </div>
+                  <div class="bar-row">
+                    <div class="bar-labels">
+                      <span class="bar-label-type">Product Quantization (8x Comp.)</span>
+                      <span class="bar-label-val" id="val-pq">160.00 MB</span>
+                    </div>
+                    <div class="bar-track"><div class="bar-fill pq" id="bar-pq"></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3: Scalar Quantization (PTQ) -->
+      <section class="slide" id="slide-3">
+        <div class="slide-header">
+          <span class="slide-tag">02. Linear Quantization</span>
+          <h2>Scalar Quantization & Offline Metrics</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <p><strong>Post-Training Scalar Quantization (PTQ)</strong> is the first line of defense. By mapping floating point numbers (like FP32 or BF16) to signed 8-bit integers (<code>int8</code>), memory is immediately halved.</p>
+            <div class="info-badge">The Math</div>
+            <div class="math-block">
+              q = clamp( round( x / S ) + Z, -128, 127 )
+            </div>
+            <p>Where <code>S</code> (Scale) and <code>Z</code> (Zero-point) are computed from the dynamic range of each embedding or dimension: <code>S = (max - min) / 255</code>.</p>
+            <div class="info-badge teal">Validation & Offline Metrics</div>
+            <p>Quantization introduces rounding noise. To measure this impact before serving, offline evaluations are run on static test datasets using key ranking metrics:</p>
+            <ul class="feature-list teal">
+              <li><strong>Recall @ K (e.g. Recall@100):</strong> Evaluates whether the quantized candidate set overlaps with the original float model's candidates.</li>
+              <li><strong>Evaluation NE (Normalized Entropy):</strong> Measures changes in the distribution predictions. Since ESR scores serve as inputs to downstream components, preservation of the probability calibration is crucial.</li>
+            </ul>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">Scalar Quantization Simulator</span>
+              </div>
+              <div class="panel-content">
+                <div class="sim-controls">
+                  <div class="slider-container">
+                    <div class="slider-label">
+                      <span>Floating Point Value (x)</span>
+                      <span class="slider-val" id="val-float">0.4500</span>
+                    </div>
+                    <input type="range" id="float-slider" min="-1.0" max="1.0" step="0.005" value="0.45">
+                  </div>
+                </div>
+                <div class="sim-values-grid">
+                  <div class="value-display-box fp">
+                    <span class="box-label">FP32 / BF16 representation</span>
+                    <span class="box-val" id="val-float-show">0.4500</span>
+                    <span class="box-binary" id="binary-fp">00111110 11100110 01100110 01100110</span>
+                  </div>
+                  <div class="value-display-box int8">
+                    <span class="box-label">Quantized INT8 Value</span>
+                    <span class="box-val" id="val-int8-quant">57</span>
+                    <span class="box-binary" id="binary-int8">00111001</span>
+                  </div>
+                </div>
+                <div class="value-display-box" style="margin-top: 16px; width: 100%;">
+                  <span class="box-label">Dequantized Value (&xcirc;)</span>
+                  <span class="box-val" id="val-dequant" style="color: var(--accent-teal);">0.4488</span>
+                </div>
+                <div class="quantization-error-banner">
+                  <span>Absolute Quantization Error:</span>
+                  <span class="error-val" id="val-error">0.001181</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 4: Quantization Aware Training (QAT) -->
+      <section class="slide" id="slide-4">
+        <div class="slide-header">
+          <span class="slide-tag">03. Active Mitigation</span>
+          <h2>Quantization-Aware Training (QAT)</h2>
+        </div>
+        <div class="slide-content-full">
+          <p>When Post-Training Quantization (PTQ) causes unacceptable drops in Recall@K or Evaluation NE, we transition to <strong>Quantization-Aware Training (QAT)</strong>. QAT models the quantization noise directly during the training forward pass, allowing the optimizer to adjust weights accordingly.</p>
+          
+          <div class="slide-content-grid" style="margin-top: 24px;">
+            <div>
+              <div class="info-badge purple">The Mechanism</div>
+              <p>In QAT, weights and activations are kept in full precision (e.g. float32), but a "fake quantization" operator is inserted. The forward pass simulates the rounding behavior:</p>
+              <div class="math-block purple">
+                x_{fake} = S \times \left( \text{clamp}\left( \text{round}\left( \frac{x}{S} \right) + Z, -128, 127 \right) - Z \right)
+              </div>
+              <p>Because the rounding step is a step function with a derivative of zero almost everywhere, we cannot compute gradients directly. To bypass this, we use the <strong>Straight-Through Estimator (STE)</strong>.</p>
+            </div>
+            
+            <div class="glass-card">
+              <h3 style="font-size: 16px; margin-bottom: 12px; font-family: var(--font-heading);">Straight-Through Estimator (STE)</h3>
+              <p style="font-size: 14px;">The derivative is identity-mapped during backpropagation, passing gradients directly to the underlying full-precision weights:</p>
+              <pre data-lang="python">
+<span class="keyword">class</span> <span class="fn">STEFunction</span>(torch.autograd.Function):
+    <span class="keyword">@staticmethod</span>
+    <span class="keyword">def</span> <span class="fn">forward</span>(ctx, x, scale):
+        <span class="comment"># Simulate quantization rounding</span>
+        <span class="keyword">return</span> torch.round(x / scale) * scale
+
+    <span class="keyword">@staticmethod</span>
+    <span class="keyword">def</span> <span class="fn">backward</span>(ctx, grad_output):
+        <span class="comment"># Identity gradient pass-through</span>
+        <span class="keyword">return</span> grad_output, <span class="builtin">None</span></pre>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: Product Quantization (PQ) -->
+      <section class="slide" id="slide-5">
+        <div class="slide-header">
+          <span class="slide-tag">04. Vector Clustering</span>
+          <h2>Product Quantization (PQ)</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <p>Instead of quantizing each individual dimension (which treats values as independent), <strong>Product Quantization (PQ)</strong> exploits correlation across dimensions by grouping them and applying vector clustering.</p>
+            <div class="info-badge">The Algorithm</div>
+            <ul class="feature-list">
+              <li><strong>Decomposition:</strong> Split a <code>D</code>-dimensional embedding vector into <code>M</code> subvectors of dimension <code>d = D/M</code>.</li>
+              <li><strong>Codebook Generation:</strong> Run K-Means clustering in each subspace across all items. A codebook containing <code>K</code> centroids (typically $K=256$, fitting in 1 byte) is generated for each subspace.</li>
+              <li><strong>Quantization:</strong> For each subvector, find the index of the closest centroid. The floating-point subvector is replaced with a single 1-byte index.</li>
+            </ul>
+            <div class="callout info">
+              <strong>Example:</strong> For D=128 in FP16 (256 bytes), splitting into M=16 subspaces of dimension d=8 reduces storage to 16 bytes. That is a **93.75% compression ratio** with minimal quality loss.
+            </div>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">Product Quantization Pipeline</span>
+              </div>
+              <div class="panel-content pq-visualizer-container">
+                <div class="vector-block-container" id="vector-container">
+                  <!-- JS will render vectors here -->
+                </div>
+                <div class="pq-explanation" id="pq-explanation">
+                  Step 1: Original High-Dimensional Vector.
+                </div>
+                <button class="pq-visualizer-step-btn" id="pq-step-btn">Split into Subspaces</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 6: End-to-End Trained Product Quantization (E2E PQ) -->
+      <section class="slide" id="slide-6">
+        <div class="slide-header">
+          <span class="slide-tag">05. Differentiable Clustering</span>
+          <h2>End-to-End Trained PQ</h2>
+        </div>
+        <div class="slide-content-full">
+          <p>Traditional PQ is a post-training operation that relies on static K-Means clustering. This decouples the quantization from the recommendation objective. <strong>End-to-End Trained PQ (E2E PQ)</strong> resolves this by integrating the codebook and assignments directly into the model graph.</p>
+          
+          <div class="slide-content-grid" style="margin-top: 20px;">
+            <div>
+              <div class="info-badge teal">Softmax-Weighted Gradients</div>
+              <p>During training, we avoid hard quantization (which has zero gradient). Instead, we represent the reconstructed vector as a <strong>softmax-weighted average</strong> over all $K$ codebook vectors:</p>
+              <div class="math-block teal">
+                x_{rec}^m = \sum_{k=1}^K w_{m,k} \cdot \mathbf{c}_{m,k} \quad \text{where} \quad w_{m,k} = \text{softmax}_k \left( \frac{\mathbf{v}_m \cdot \mathbf{c}_{m,k}}{\tau} \right)
+              </div>
+              <p>Here, $\mathbf{v}_m$ is the output of the object tower subspace, $\mathbf{c}_{m,k}$ is a trainable centroid, and $\tau$ is a temperature parameter that controls the sharpness of the distribution.</p>
+            </div>
+            
+            <div class="glass-card">
+              <h3 style="font-size: 16px; margin-bottom: 12px; font-family: var(--font-heading);">Gradient Flow & Inference</h3>
+              <ul class="feature-list teal">
+                <li><strong>Backward Pass:</strong> Gradients flow directly back to the object tower parameters (which adjust $\mathbf{v}_m$) and to the codebook vectors ($\mathbf{c}_{m,k}$), optimizing centroids for the ranking objective.</li>
+                <li><strong>Temperature Annealing:</strong> During training, $\tau$ is gradually decreased ($\tau \to 0$). The softmax weights approach a one-hot vector.</li>
+                <li><strong>Inference:</strong> Hard argmax is applied. The object tower outputs the single index $k = \text{argmax}(w_{m,k})$. Only the 1-byte indices are saved to GPU.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 7: TurboQuant -->
+      <section class="slide" id="slide-7">
+        <div class="slide-header">
+          <span class="slide-tag">06. Variance Balancing</span>
+          <h2>TurboQuant</h2>
+        </div>
+        <div class="slide-content-full">
+          <div class="slide-content-grid">
+            <div>
+              <p>Standard vector quantization methods struggle when variance is distributed unevenly across dimensions, or when dimensions are highly correlated. <strong>TurboQuant</strong> solves this by preprocessing the embedding space prior to quantization.</p>
+              <div class="info-badge purple">The Algorithm</div>
+              <ul class="feature-list purple">
+                <li><strong>Orthogonal Rotation:</strong> Multiplies the embedding by a random orthogonal matrix $R$. Since $R^T R = I$, distance and inner products (cosine similarity) are preserved: 
+                  <div class="math-block purple" style="font-size: 15px; margin: 8px 0;">
+                    \langle R x, R y \rangle = x^T R^T R y = x^T y
+                  </div>
+                </li>
+                <li><strong>Variance Spreading:</strong> The rotation redistributes energy, balancing the variance evenly across all dimensions.</li>
+                <li><strong>Centroid Fitting:</strong> For each dimension, a 1D scalar quantizer (or PQ codebook) fits a set of centroids and replaces values with indices. Because dimensions now share similar value ranges, quantization noise is minimized.</li>
+              </ul>
+            </div>
+            <div class="glass-card" style="display: flex; flex-direction: column; justify-content: center;">
+              <h3 style="font-size: 16px; margin-bottom: 12px; font-family: var(--font-heading);">Why Rotate?</h3>
+              <p style="font-size: 14px;">If one dimension has a range of $[-10, 10]$ and another $[-0.1, 0.1]$, a uniform quantizer will either clip the high-variance dimension or under-represent the low-variance one. Rotating balances the dimensions, ensuring uniform resolution is highly effective.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 8: SpectralQuant -->
+      <section class="slide" id="slide-8">
+        <div class="slide-header">
+          <span class="slide-tag">07. Optimal Rotation & SVD</span>
+          <h2>SpectralQuant</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <p><strong>SpectralQuant</strong> is an evolutionary leap over TurboQuant. Instead of a random rotation matrix, SpectralQuant uses data-driven rotations derived from <strong>Singular Value Decomposition (SVD)</strong>.</p>
+            <div class="info-badge">How It Works</div>
+            <ul class="feature-list">
+              <li><strong>SVD Rotation:</strong> Decompose the embedding matrix $X = U\Sigma V^T$. We rotate the space using the right singular vectors $V^T$. This aligns coordinates directly along principal components (PCA).</li>
+              <li><strong>Dimension Importance:</strong> Each dimension is now orthogonal, with variance proportional to its eigenvalue $\lambda_i$.</li>
+              <li><strong>Adaptive Bit Allocation:</strong> Instead of uniform bit widths, allocate bits proportional to:
+                <div class="math-block" style="font-size: 15px; margin: 8px 0;">
+                  b_i \propto \log_4(\lambda_i)
+                </div>
+                Important directions get more bits (e.g. 6 or 8 bits), while minor noise dimensions get fewer (e.g. 2 bits or even 0).
+              </li>
+            </ul>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">Embedding Space Rotation & Bins</span>
+              </div>
+              <div class="panel-content">
+                <div class="rotation-canvas-container">
+                  <canvas id="rotation-canvas"></canvas>
+                  <div class="rotation-controls">
+                    <button class="btn-rot active" data-mode="original">Original</button>
+                    <button class="btn-rot" data-mode="turbo">TurboQuant</button>
+                    <button class="btn-rot" data-mode="spectral">SpectralQuant</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 9: Summary & Comparison -->
+      <section class="slide" id="slide-9">
+        <div class="slide-header">
+          <span class="slide-tag">Conclusion</span>
+          <h2>Quantization Options Matrix</h2>
+        </div>
+        <div class="slide-content-full" style="display: flex; flex-direction: column; gap: 20px;">
+          <div class="table-wrapper">
+            <table class="comp-table">
+              <thead>
+                <tr>
+                  <th>Method</th>
+                  <th>Memory Compression</th>
+                  <th>Serving Overhead</th>
+                  <th>Recall / NE Metric Impact</th>
+                  <th>Training Requirements</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td class="strong">Scalar PTQ (INT8)</td>
+                  <td>50% savings</td>
+                  <td>Negligible (hardware dequant)</td>
+                  <td><span class="badge-res yellow">Low-Moderate drop</span></td>
+                  <td>Post-training calibration only</td>
+                </tr>
+                <tr>
+                  <td class="strong">Scalar QAT (INT8)</td>
+                  <td>50% savings</td>
+                  <td>Negligible (hardware dequant)</td>
+                  <td><span class="badge-res green">Negligible drop</span></td>
+                  <td>Full training with STE</td>
+                </tr>
+                <tr>
+                  <td class="strong">Product Quantization (PQ)</td>
+                  <td>90% - 95% savings</td>
+                  <td>Low-Medium (codebook lookup)</td>
+                  <td><span class="badge-res yellow">Moderate drop</span></td>
+                  <td>Post-training K-Means clustering</td>
+                </tr>
+                <tr>
+                  <td class="strong">End-to-End PQ</td>
+                  <td>90% - 95% savings</td>
+                  <td>Low-Medium (codebook lookup)</td>
+                  <td><span class="badge-res green">Low drop</span></td>
+                  <td>Joint training of codebook + model</td>
+                </tr>
+                <tr>
+                  <td class="strong">TurboQuant</td>
+                  <td>90% - 97% savings</td>
+                  <td>Medium (orthogonal matrix multiply)</td>
+                  <td><span class="badge-res green">Low drop</span></td>
+                  <td>Random rotation + fits centroids</td>
+                </tr>
+                <tr>
+                  <td class="strong">SpectralQuant</td>
+                  <td>90% - 97% savings</td>
+                  <td>Medium (rotation + adaptive lookup)</td>
+                  <td><span class="badge-res green">Optimal retention</span></td>
+                  <td>SVD calculation + adaptive bit assign</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          
+          <div class="callout info" style="margin: 0;">
+            <strong>Serving Architecture Recommendation:</strong> If GPU memory is moderately tight, start with <strong>Scalar QAT (INT8)</strong> to keep inference fast with zero metric degradation. If memory is extremely constrained (millions of objects), use <strong>SpectralQuant</strong> or <strong>End-to-End PQ</strong> to maximize accuracy under tight sub-byte compression.
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Footer Controls -->
+    <footer>
+      <div class="keyboard-hints">
+        <span><span class="key-cap">←</span> Prev</span>
+        <span>Next <span class="key-cap">→</span> / <span class="key-cap">Space</span></span>
+      </div>
+      <div class="controls-buttons">
+        <button class="btn-nav" id="btn-prev" aria-label="Previous Slide">&larr;</button>
+        <button class="btn-nav" id="btn-next" aria-label="Next Slide">&rarr;</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
