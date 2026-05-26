@@ -111,9 +111,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const fp32Bytes = V * D * 4;
     const fp16Bytes = V * D * 2;
     const int8Bytes = V * D * 1;
-    // PQ: Split D into subvectors of size 8. Each subvector gets 1 byte index.
-    // Plus the codebook size (256 centroids * 8 dimensions * 4 bytes/float * D/8 channels). This is small so we ignore or add as constant.
-    const pqBytes = V * (D / 8) * 1; 
+    // PQ: Assume we are using 80x256 which means 80 bytes for D=256. Scale with D.
+    const pqBytes = V * Math.round(D * (80 / 256)); 
     
     document.getElementById('val-fp32').textContent = formatBytes(fp32Bytes);
     document.getElementById('val-fp16').textContent = formatBytes(fp16Bytes);

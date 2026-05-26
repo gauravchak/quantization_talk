@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Quantization Options in Early-Stage Ranking (ESR)</title>
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/contrib/auto-render.min.js" onload="renderMathInElement(document.body, { delimiters: [ {left: '$$', right: '$$', display: true}, {left: '$', right: '$', display: false} ] });"></script>
 </head>
 <body>
 
@@ -102,8 +105,8 @@
                   </div>
                   <div class="bar-row">
                     <div class="bar-labels">
-                      <span class="bar-label-type">Product Quantization (8x Comp.)</span>
-                      <span class="bar-label-val" id="val-pq">29.80 GB</span>
+                      <span class="bar-label-type">Product Quantization (80 Bytes/item)</span>
+                      <span class="bar-label-val" id="val-pq">74.51 GB</span>
                     </div>
                     <div class="bar-track"><div class="bar-fill pq" id="bar-pq"></div></div>
                   </div>
@@ -125,7 +128,7 @@
             <p><strong>Post-Training Scalar Quantization (PTQ)</strong> is the first line of defense. By mapping floating point numbers (like FP32 or BF16) to signed 8-bit integers (<code>int8</code>), memory is immediately halved.</p>
             <div class="info-badge">The Math</div>
             <div class="math-block">
-              q = clamp( round( x / S ) + Z, -128, 127 )
+              $$q = \text{clamp}\left( \text{round}\left( \frac{x}{S} \right) + Z, -128, 127 \right)$$
             </div>
             <p>Where <code>S</code> (Scale) and <code>Z</code> (Zero-point) are computed from the dynamic range of each embedding or dimension: <code>S = (max - min) / 255</code>.</p>
             <div class="info-badge teal">Validation & Offline Metrics</div>
@@ -190,7 +193,7 @@
               <div class="info-badge purple">The Mechanism</div>
               <p>In QAT, weights and activations are kept in full precision (e.g. float32), but a "fake quantization" operator is inserted. The forward pass simulates the rounding behavior:</p>
               <div class="math-block purple">
-                x_{fake} = S \times \left( \text{clamp}\left( \text{round}\left( \frac{x}{S} \right) + Z, -128, 127 \right) - Z \right)
+                $$x_{\text{fake}} = S \times \left( \text{clamp}\left( \text{round}\left( \frac{x}{S} \right) + Z, -128, 127 \right) - Z \right)$$
               </div>
               <p>Because the rounding step is a step function with a derivative of zero almost everywhere, we cannot compute gradients directly. To bypass this, we use the <strong>Straight-Through Estimator (STE)</strong>.</p>
             </div>
@@ -230,7 +233,7 @@
               <li><strong>Quantization:</strong> For each subvector, find the index of the closest centroid. The floating-point subvector is replaced with a single 1-byte index.</li>
             </ul>
             <div class="callout info">
-              <strong>Example:</strong> For D=128 in FP16 (256 bytes), splitting into M=16 subspaces of dimension d=8 reduces storage to 16 bytes. That is a **93.75% compression ratio** with minimal quality loss.
+              <strong>Example:</strong> For D=256 in FP16 (512 bytes), splitting into M=80 subspaces reduces storage to 80 bytes (assuming 80x256 codebook indices). That is an **84.38% memory savings (6.4x compression)** with minimal quality loss.
             </div>
           </div>
           <div class="visualizer-col">
@@ -266,7 +269,7 @@
               <div class="info-badge teal">Softmax-Weighted Gradients</div>
               <p>During training, we avoid hard quantization (which has zero gradient). Instead, we represent the reconstructed vector as a <strong>softmax-weighted average</strong> over all $K$ codebook vectors:</p>
               <div class="math-block teal">
-                x_{rec}^m = \sum_{k=1}^K w_{m,k} \cdot \mathbf{c}_{m,k} \quad \text{where} \quad w_{m,k} = \text{softmax}_k \left( \frac{\mathbf{v}_m \cdot \mathbf{c}_{m,k}}{\tau} \right)
+                $$\mathbf{x}_{\text{rec}}^m = \sum_{k=1}^K w_{m,k} \cdot \mathbf{c}_{m,k} \quad \text{where} \quad w_{m,k} = \text{softmax}_k \left( \frac{\mathbf{v}_m \cdot \mathbf{c}_{m,k}}{\tau} \right)$$
               </div>
               <p>Here, $\mathbf{v}_m$ is the output of the object tower subspace, $\mathbf{c}_{m,k}$ is a trainable centroid, and $\tau$ is a temperature parameter that controls the sharpness of the distribution.</p>
             </div>
@@ -297,7 +300,7 @@
               <ul class="feature-list purple">
                 <li><strong>Orthogonal Rotation:</strong> Multiplies the embedding by a random orthogonal matrix $R$. Since $R^T R = I$, distance and inner products (cosine similarity) are preserved: 
                   <div class="math-block purple" style="font-size: 15px; margin: 8px 0;">
-                    \langle R x, R y \rangle = x^T R^T R y = x^T y
+                    $$\langle R x, R y \rangle = x^T R^T R y = x^T y$$
                   </div>
                 </li>
                 <li><strong>Variance Spreading:</strong> The rotation redistributes energy, balancing the variance evenly across all dimensions.</li>
@@ -327,7 +330,7 @@
               <li><strong>Dimension Importance:</strong> Each dimension is now orthogonal, with variance proportional to its eigenvalue $\lambda_i$.</li>
               <li><strong>Adaptive Bit Allocation:</strong> Instead of uniform bit widths, allocate bits proportional to:
                 <div class="math-block" style="font-size: 15px; margin: 8px 0;">
-                  b_i \propto \log_4(\lambda_i)
+                  $$b_i \propto \log_4(\lambda_i)$$
                 </div>
                 Important directions get more bits (e.g. 6 or 8 bits), while minor noise dimensions get fewer (e.g. 2 bits or even 0).
               </li>
