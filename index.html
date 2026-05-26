@@ -48,11 +48,12 @@
       <section class="slide" id="slide-2">
         <div class="slide-header">
           <span class="slide-tag">01. Serving Bottleneck</span>
-          <h2>Moving ESR to GPU Serving</h2>
+          <h2>Moving Early Stage Ranking (<a href="https://recsysml.substack.com/p/early-stage-ranking-in-recommender" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">ESR</a>) to GPU Serving</h2>
         </div>
         <div class="slide-content-grid">
           <div class="narrative-col">
-            <p>In modern two-tower recommender stacks, the <strong>Early Stage Ranking (ESR)</strong> filters billions of candidate items down to thousands before the Late Stage Ranker (LSR) processes them. To maximize throughput and capture complex cross-features, serving is shifted to GPUs.</p>
+            <p>In modern latency and capacity efficient recommender systems, inference time compute, especially in feature fetching is implemented as a cascaded stack, where retrieval fetches ~2k items from billions, ESR fine tunes down to ~200 and LSR finds the top 2-3 items to show the user.</p>
+            <p>Serving ESR on GPUs increases throughput of complex ML ops.</p>
             <div class="info-badge">The Architecture</div>
             <p>During training, the user tower is modeled with <code>U × D</code> embeddings and the object tower maps objects to <code>O × D</code> embeddings. Training utilizes the same user-impressed data as LSR. However, serving constraints differ drastically:</p>
             <ul class="feature-list">
