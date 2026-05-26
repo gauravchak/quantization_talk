@@ -1,4 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
+  // === KATEX AUTO-RENDER ===
+  if (typeof renderMathInElement === 'function') {
+    renderMathInElement(document.body, {
+      delimiters: [
+        {left: '$$', right: '$$', display: true},
+        {left: '$', right: '$', display: false}
+      ]
+    });
+  }
+
   // === SLIDE NAVIGATION SYSTEM ===
   const slides = Array.from(document.querySelectorAll('.slide'));
   const prevBtn = document.getElementById('btn-prev');
@@ -171,6 +181,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const err = Math.abs(x - xHat);
     
     valFloat.textContent = x.toFixed(4);
+    const valFloatShow = document.getElementById('val-float-show');
+    if (valFloatShow) {
+      valFloatShow.textContent = x.toFixed(4);
+    }
     valInt8.textContent = q;
     valDequant.textContent = xHat.toFixed(4);
     valError.textContent = err.toFixed(6);
