@@ -59,7 +59,7 @@
             <ul class="feature-list">
               <li><strong>User Tower:</strong> Inferred on-the-fly using the user's real-time context.</li>
               <li><strong>Object Tower:</strong> Pre-computed offline. All object embeddings (often millions of items) must be pre-loaded into GPU High Bandwidth Memory (HBM) for sub-millisecond similarity lookups.</li>
-              <li><strong>The Bottleneck:</strong> GPU memory is highly constrained. A vocabulary of 10 million items at 128 dimensions in BF16 requires 2.56 GB of raw HBM, excluding index structures, model weights, and search libraries (e.g. FAISS).</li>
+              <li><strong>The Bottleneck:</strong> GPU memory is highly constrained. Using 40 GB memory for instance with 256 dim FP16 still only allows only 84 million items, which could be a fraction of the recommendable corpus size.</li>
             </ul>
           </div>
           <div class="visualizer-col">
