@@ -222,7 +222,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (i % 2 === 0) {
           // Output index instead of float
           const codebookIndex = ['Idx #42', 'Idx #103', 'Idx #21', 'Idx #88'][group];
-          return `<div class="vector-dimension" style="background: ${colors[group]}; width: 68px; font-weight: bold; border: 1px solid rgba(255,255,255,0.25);">${codebookIndex}</div>`;
+          return `<div class="vector-dimension pq-index-dimension" style="background: ${colors[group]}; font-weight: bold; border: 1px solid rgba(255,255,255,0.25);">${codebookIndex}</div>`;
         } else {
           return ''; // Hide every second element since 2 floats collapse to 1 index
         }

@@ -42,7 +42,9 @@
           <h1>Object embedding quantization options in <a href="https://recsysml.substack.com/p/early-stage-ranking-in-recommender" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">Early stage ranking</a></h1>
           <p>Which Quantization approach leads to packing more object embeddings in GPU memory and at higher <a href="https://recsysml.substack.com/p/early-stage-ranking-in-recommender" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">ESR</a> metrics?</p>
           <div class="author">
-            Use <span class="key-cap">→</span> or <span class="key-cap">Space</span> to navigate. Click widgets to interact.
+            <span class="desktop-hint">Use <span class="key-cap">→</span> or <span class="key-cap">Space</span> to navigate.</span>
+            <span class="mobile-hint">Swipe or use navigation buttons below.</span>
+            Click widgets to interact.
           </div>
         </div>
       </section>
@@ -81,7 +83,7 @@
                 <!-- Training Card -->
                 <div class="glass-card highlight" style="padding: 14px; border-color: rgba(167, 139, 250, 0.2);">
                   <div style="color: var(--accent-purple); font-weight: 600; font-size: 13px; margin-bottom: 8px; font-family: var(--font-mono); text-transform: uppercase;">1. Training Phase (Joint)</div>
-                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-align: center; gap: 4px;">
+                  <div class="training-flow-row" style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-align: center; gap: 4px;">
                     <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 6px; flex: 1;">User Tower<br><span style="color: var(--text-muted);">U &times; D</span></div>
                     <div style="color: var(--accent-purple); font-weight: bold;">&rarr;</div>
                     <div style="background: rgba(167, 139, 250, 0.1); padding: 8px; border-radius: 6px; font-weight: bold; border: 1px solid rgba(167, 139, 250, 0.2); flex: 1.2;">OverArch<br><span style="font-size: 9px; color: var(--text-secondary);">Multi-Task Loss</span></div>
@@ -102,7 +104,7 @@
                     </div>
                     
                     <!-- Online request -->
-                    <div style="background: rgba(45, 212, 191, 0.03); padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px dashed rgba(45, 212, 191, 0.2);">
+                    <div class="inference-flow-row" style="background: rgba(45, 212, 191, 0.03); padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px dashed rgba(45, 212, 191, 0.2);">
                       <div style="text-align: left;">
                         <strong>Request Time:</strong><br>
                         User Context &rarr; User Tower
