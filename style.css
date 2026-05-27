@@ -405,13 +405,17 @@ code {
   display: block;
   background: rgba(255, 255, 255, 0.02);
   border-left: 4px solid var(--accent-blue);
-  padding: 12px 18px;
-  margin: 16px 0;
+  padding: 4px 12px;
+  margin: 6px 0;
   border-radius: 0 8px 8px 0;
   font-family: 'Outfit', sans-serif;
   font-size: 17px;
   color: var(--text-primary);
   letter-spacing: 0.5px;
+}
+
+.math-block .katex-display {
+  margin: 4px 0;
 }
 
 .math-block.teal {

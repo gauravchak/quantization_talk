@@ -28,7 +28,7 @@
         <div class="progress-bar-bg">
           <div class="progress-bar-fill"></div>
         </div>
-        <div class="progress-text">1 / 9</div>
+        <div class="progress-text">1 / 10</div>
       </div>
     </header>
 
@@ -39,30 +39,106 @@
       <section class="slide active" id="slide-1">
         <div class="slide-title-layout">
           <span class="slide-tag">GPU Serving Optimization</span>
-          <h1>Quantization Options in<br>Early-Stage Ranking (ESR)</h1>
-          <p>Strategies for compressing massive object towers into GPU memory for real-time recommender systems.</p>
+          <h1>Object embedding quantization options in Early stage ranking</h1>
+          <p>Which Quantization approach leads to packing more object embeddings in GPU memory and at higher ESR metrics?</p>
           <div class="author">
             Use <span class="key-cap">→</span> or <span class="key-cap">Space</span> to navigate. Click widgets to interact.
           </div>
         </div>
       </section>
 
-      <!-- SLIDE 2: Context / The Problem -->
+      <!-- SLIDE 2: ESR Core Architecture -->
+      <section class="slide" id="slide-esr-arch">
+        <div class="slide-header">
+          <span class="slide-tag">01. Core Architecture</span>
+          <h2>ESR Lifecycle: Joint Training vs. Disaggregated Serving</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <div class="info-badge purple">Phase A: Joint Training</div>
+            <p>During the offline training phase, both the User and Object representations are learned simultaneously using the user's historical interaction logs:</p>
+            <ul class="feature-list purple">
+              <li><strong>Twin Towers:</strong> The User Tower maps user states to a $D$-dimensional vector, while the Object Tower maps items to $D$-dimensional vectors.</li>
+              <li><strong>The OverArch:</strong> Tower outputs are combined (e.g., via dot product and cross-features) and fed into the <em>OverArch</em> layer.</li>
+              <li><strong>Multi-Task Prediction:</strong> The OverArch predicts multiple downstream objectives (Clicks, Conversions, Watch Time) using shared representation training.</li>
+            </ul>
+            
+            <div class="info-badge teal">Phase B: Disaggregated Inference</div>
+            <p>At serving time, execution is decoupled to meet strict latency budgets:</p>
+            <ul class="feature-list teal">
+              <li><strong>Item Publishing (Offline):</strong> Pre-compute embeddings for all objects in the recommendable item corpus and publish them directly into GPU HBM.</li>
+              <li><strong>User Embedding (Online):</strong> At query time, run the User Tower once to obtain the active user's embedding.</li>
+              <li><strong>OverArch Scoring:</strong> Retrieve candidate object embeddings from GPU memory, combine them with the user vector, and run the OverArch on-the-fly.</li>
+            </ul>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">System Execution Flow</span>
+              </div>
+              <div class="panel-content" style="display: flex; flex-direction: column; gap: 20px; align-items: stretch; justify-content: flex-start; overflow-y: auto;">
+                
+                <!-- Training Card -->
+                <div class="glass-card highlight" style="padding: 14px; border-color: rgba(167, 139, 250, 0.2);">
+                  <div style="color: var(--accent-purple); font-weight: 600; font-size: 13px; margin-bottom: 8px; font-family: var(--font-mono); text-transform: uppercase;">1. Training Phase (Joint)</div>
+                  <div style="display: flex; align-items: center; justify-content: space-between; font-size: 11px; text-align: center; gap: 4px;">
+                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 6px; flex: 1;">User Tower<br><span style="color: var(--text-muted);">U &times; D</span></div>
+                    <div style="color: var(--accent-purple); font-weight: bold;">&rarr;</div>
+                    <div style="background: rgba(167, 139, 250, 0.1); padding: 8px; border-radius: 6px; font-weight: bold; border: 1px solid rgba(167, 139, 250, 0.2); flex: 1.2;">OverArch<br><span style="font-size: 9px; color: var(--text-secondary);">Multi-Task Loss</span></div>
+                    <div style="color: var(--accent-purple); font-weight: bold;">&larr;</div>
+                    <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 6px; flex: 1;">Object Tower<br><span style="color: var(--text-muted);">O &times; D</span></div>
+                  </div>
+                </div>
+
+                <!-- Inference Card -->
+                <div class="glass-card" style="padding: 14px; border-color: rgba(45, 212, 191, 0.2);">
+                  <div style="color: var(--accent-teal); font-weight: 600; font-size: 13px; margin-bottom: 8px; font-family: var(--font-mono); text-transform: uppercase;">2. Inference Phase (Disaggregated)</div>
+                  
+                  <div style="display: flex; flex-direction: column; gap: 8px; font-size: 11px;">
+                    <!-- Offline publishing -->
+                    <div style="background: rgba(255, 255, 255, 0.02); padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px solid rgba(255,255,255,0.05);">
+                      <div><strong>Offline:</strong> Object Tower &rarr; Embeddings</div>
+                      <div style="background: rgba(45, 212, 191, 0.1); color: var(--accent-teal); padding: 2px 6px; border-radius: 4px; font-weight: bold; font-family: var(--font-mono);">Publish to HBM</div>
+                    </div>
+                    
+                    <!-- Online request -->
+                    <div style="background: rgba(45, 212, 191, 0.03); padding: 8px; border-radius: 6px; display: flex; align-items: center; justify-content: space-between; border: 1px dashed rgba(45, 212, 191, 0.2);">
+                      <div style="text-align: left;">
+                        <strong>Request Time:</strong><br>
+                        User Context &rarr; User Tower
+                      </div>
+                      <div style="font-size: 20px; color: var(--accent-teal);">&rarr;</div>
+                      <div style="background: rgba(255,255,255,0.05); padding: 4px 8px; border-radius: 4px; text-align: center;">
+                        <strong>GPU Evaluator</strong><br>
+                        <span style="font-size: 9px; color: var(--accent-blue);">OverArch + HBM Embeddings</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 3: Context / The Problem -->
       <section class="slide" id="slide-2">
         <div class="slide-header">
-          <span class="slide-tag">01. Serving Bottleneck</span>
+          <span class="slide-tag">02. Serving Bottleneck</span>
           <h2>Moving Early Stage Ranking (<a href="https://recsysml.substack.com/p/early-stage-ranking-in-recommender" target="_blank" style="color: var(--accent-blue); text-decoration: underline;">ESR</a>) to GPU Serving</h2>
         </div>
         <div class="slide-content-grid">
           <div class="narrative-col">
-            <p>In modern latency and capacity efficient recommender systems, inference time compute, especially in feature fetching is implemented as a cascaded stack, where retrieval fetches ~2k items from billions, ESR fine tunes down to ~200 and LSR finds the top 2-3 items to show the user.</p>
-            <p>Serving ESR on GPUs increases throughput of complex ML ops.</p>
-            <div class="info-badge">The Architecture</div>
-            <p>During training, the user tower is modeled with <code>U × D</code> embeddings and the object tower maps objects to <code>O × D</code> embeddings. Training utilizes the same user-impressed data as LSR. However, serving constraints differ drastically:</p>
+            <p>While serving Early Stage Ranking on GPUs increases the throughput of complex ML operations, it introduces a severe hardware bottleneck: <strong>GPU High Bandwidth Memory (HBM) capacity</strong>.</p>
+            
+            <div class="info-badge">The HBM Constraint</div>
+            <p>Unlike standard CPU servers where RAM is easily scalable, GPU serving is bounded by the onboard HBM limit (e.g., 40 GB or 80 GB remaining after model storage).</p>
+            
             <ul class="feature-list">
-              <li><strong>User Tower:</strong> Inferred on-the-fly using the user's real-time context.</li>
-              <li><strong>Object Tower:</strong> Pre-computed offline. All object embeddings (often millions of items) must be pre-loaded into GPU High Bandwidth Memory (HBM) for sub-millisecond similarity lookups.</li>
-              <li><strong>The Bottleneck:</strong> GPU memory is highly constrained. Using 40 GB memory for instance with 256 dim FP16 still only allows only 84 million items, which could be a fraction of the recommendable corpus size.</li>
+              <li><strong>Scale Bottleneck:</strong> Storing item embeddings in standard FP16 (256 dimensions) for 1 billion items requires 512 GB of raw memory—far exceeding single GPU limits.</li>
+              <li><strong>Latency Constraint:</strong> Storing embeddings in host CPU memory (RAM) or SSD and streaming them to the GPU via PCIe during inference introduces transmission delays that violate the strict sub-millisecond latency budgets of ESR. Keeping embeddings directly in HBM is mandatory.</li>
+              <li><strong>The Solution:</strong> Quantization and compression are required to pack the entire recommendable corpus directly into GPU memory.</li>
             </ul>
           </div>
           <div class="visualizer-col">
@@ -120,7 +196,7 @@
       <!-- SLIDE 3: Scalar Quantization (PTQ) -->
       <section class="slide" id="slide-3">
         <div class="slide-header">
-          <span class="slide-tag">02. Linear Quantization</span>
+          <span class="slide-tag">03. Linear Quantization</span>
           <h2>Scalar Quantization & Offline Metrics</h2>
         </div>
         <div class="slide-content-grid">
@@ -134,7 +210,7 @@
             <div class="info-badge teal">Validation & Offline Metrics</div>
             <p>Quantization introduces rounding noise. To measure this impact before serving, offline evaluations are run on static test datasets using key ranking metrics:</p>
             <ul class="feature-list teal">
-              <li><strong>Recall @ K (e.g. Recall@100):</strong> Evaluates whether the quantized candidate set overlaps with the original float model's candidates.</li>
+              <li><strong>Recall @ K (e.g. Recall@100):</strong> Evaluates recall of Late Stage Ranking top candidates against quantization equipped ranking by ESR.</li>
               <li><strong>Evaluation NE (Normalized Entropy):</strong> Measures changes in the distribution predictions. Since ESR scores serve as inputs to downstream components, preservation of the probability calibration is crucial.</li>
             </ul>
           </div>
@@ -182,7 +258,7 @@
       <!-- SLIDE 4: Quantization Aware Training (QAT) -->
       <section class="slide" id="slide-4">
         <div class="slide-header">
-          <span class="slide-tag">03. Active Mitigation</span>
+          <span class="slide-tag">04. Active Mitigation</span>
           <h2>Quantization-Aware Training (QAT)</h2>
         </div>
         <div class="slide-content-full">
@@ -220,7 +296,7 @@
       <!-- SLIDE 5: Product Quantization (PQ) -->
       <section class="slide" id="slide-5">
         <div class="slide-header">
-          <span class="slide-tag">04. Vector Clustering</span>
+          <span class="slide-tag">05. Vector Clustering</span>
           <h2>Product Quantization (PQ)</h2>
         </div>
         <div class="slide-content-grid">
@@ -258,20 +334,26 @@
       <!-- SLIDE 6: End-to-End Trained Product Quantization (E2E PQ) -->
       <section class="slide" id="slide-6">
         <div class="slide-header">
-          <span class="slide-tag">05. Differentiable Clustering</span>
+          <span class="slide-tag">06. Differentiable Clustering</span>
           <h2>End-to-End Trained PQ</h2>
         </div>
         <div class="slide-content-full">
           <p>Traditional PQ is a post-training operation that relies on static K-Means clustering. This decouples the quantization from the recommendation objective. <strong>End-to-End Trained PQ (E2E PQ)</strong> resolves this by integrating the codebook and assignments directly into the model graph.</p>
           
           <div class="slide-content-grid" style="margin-top: 20px;">
-            <div>
+            <div class="narrative-col">
               <div class="info-badge teal">Softmax-Weighted Gradients</div>
               <p>During training, we avoid hard quantization (which has zero gradient). Instead, we represent the reconstructed vector as a <strong>softmax-weighted average</strong> over all $K$ codebook vectors:</p>
-              <div class="math-block teal">
+              <div class="math-block teal" style="margin: 8px 0;">
                 $$\mathbf{x}_{\text{rec}}^m = \sum_{k=1}^K w_{m,k} \cdot \mathbf{c}_{m,k} \quad \text{where} \quad w_{m,k} = \text{softmax}_k \left( \frac{\mathbf{v}_m \cdot \mathbf{c}_{m,k}}{\tau} \right)$$
               </div>
-              <p>Here, $\mathbf{v}_m$ is the output of the object tower subspace, $\mathbf{c}_{m,k}$ is a trainable centroid, and $\tau$ is a temperature parameter that controls the sharpness of the distribution.</p>
+              <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 12px;">Here, $\mathbf{v}_m$ is the output of the object tower subspace, $\mathbf{c}_{m,k}$ is a trainable centroid, and $\tau$ is a temperature parameter.</p>
+              
+              <div class="info-badge teal" style="margin-bottom: 8px; display: inline-flex;">Joint Loss Objective</div>
+              <p style="font-size: 14px; margin-bottom: 8px;">To prevent representation collapse (where the model ignores the object tower features and memorizes static item IDs), the training objective minimizes both the downstream ranking loss and the reconstruction loss:</p>
+              <div class="math-block teal" style="margin: 8px 0;">
+                $$\mathcal{L}_{\text{total}} = \mathcal{L}_{\text{BCE}} + \alpha \sum_{m=1}^M \|\mathbf{v}_m - \mathbf{x}_{\text{rec}}^m\|^2$$
+              </div>
             </div>
             
             <div class="glass-card">
@@ -279,7 +361,7 @@
               <ul class="feature-list teal">
                 <li><strong>Backward Pass:</strong> Gradients flow directly back to the object tower parameters (which adjust $\mathbf{v}_m$) and to the codebook vectors ($\mathbf{c}_{m,k}$), optimizing centroids for the ranking objective.</li>
                 <li><strong>Temperature Annealing:</strong> During training, $\tau$ is gradually decreased ($\tau \to 0$). The softmax weights approach a one-hot vector.</li>
-                <li><strong>Inference:</strong> Hard argmax is applied. The object tower outputs the single index $k = \text{argmax}(w_{m,k})$. Only the 1-byte indices are saved to GPU.</li>
+                <li><strong>Inference:</strong> Hard argmax is applied. The object tower outputs the single index $k = \text{argmax}(w_{m,k})$. Only the 1-byte indices are saved to GPU. <br><em>Note: Object tower inference is not latency sensitive since it is computed offline.</em></li>
               </ul>
             </div>
           </div>
@@ -289,7 +371,7 @@
       <!-- SLIDE 7: TurboQuant -->
       <section class="slide" id="slide-7">
         <div class="slide-header">
-          <span class="slide-tag">06. Variance Balancing</span>
+          <span class="slide-tag">07. Variance Balancing</span>
           <h2>TurboQuant</h2>
         </div>
         <div class="slide-content-full">
@@ -318,7 +400,7 @@
       <!-- SLIDE 8: SpectralQuant -->
       <section class="slide" id="slide-8">
         <div class="slide-header">
-          <span class="slide-tag">07. Optimal Rotation & SVD</span>
+          <span class="slide-tag">08. Optimal Rotation & SVD</span>
           <h2>SpectralQuant</h2>
         </div>
         <div class="slide-content-grid">
@@ -379,42 +461,42 @@
                   <td class="strong">Scalar PTQ (INT8)</td>
                   <td>50% savings</td>
                   <td>Negligible (hardware dequant)</td>
-                  <td><span class="badge-res yellow">Low-Moderate drop</span></td>
+                  <td><span class="badge-res red">Significant drop (~10% recall)</span></td>
                   <td>Post-training calibration only</td>
                 </tr>
                 <tr>
                   <td class="strong">Scalar QAT (INT8)</td>
                   <td>50% savings</td>
                   <td>Negligible (hardware dequant)</td>
-                  <td><span class="badge-res green">Negligible drop</span></td>
+                  <td><span class="badge-res red">Significant drop (~10% recall)</span></td>
                   <td>Full training with STE</td>
                 </tr>
                 <tr>
                   <td class="strong">Product Quantization (PQ)</td>
-                  <td>90% - 95% savings</td>
+                  <td>84% - 95% savings</td>
                   <td>Low-Medium (codebook lookup)</td>
-                  <td><span class="badge-res yellow">Moderate drop</span></td>
+                  <td><span class="badge-res green">Best Tradeoff (~1% recall drop)</span></td>
                   <td>Post-training K-Means clustering</td>
                 </tr>
                 <tr>
                   <td class="strong">End-to-End PQ</td>
-                  <td>90% - 95% savings</td>
+                  <td>84% - 95% savings</td>
                   <td>Low-Medium (codebook lookup)</td>
-                  <td><span class="badge-res green">Low drop</span></td>
+                  <td><span class="badge-res green">Highly accurate (~1% recall drop)</span></td>
                   <td>Joint training of codebook + model</td>
                 </tr>
                 <tr>
                   <td class="strong">TurboQuant</td>
                   <td>90% - 97% savings</td>
                   <td>Medium (orthogonal matrix multiply)</td>
-                  <td><span class="badge-res green">Low drop</span></td>
+                  <td><span class="badge-res yellow">Moderate drop (better than Scalar)</span></td>
                   <td>Random rotation + fits centroids</td>
                 </tr>
                 <tr>
                   <td class="strong">SpectralQuant</td>
                   <td>90% - 97% savings</td>
                   <td>Medium (rotation + adaptive lookup)</td>
-                  <td><span class="badge-res green">Optimal retention</span></td>
+                  <td><span class="badge-res green">Theoretical improvement over Turbo</span></td>
                   <td>SVD calculation + adaptive bit assign</td>
                 </tr>
               </tbody>
@@ -422,7 +504,7 @@
           </div>
           
           <div class="callout info" style="margin: 0;">
-            <strong>Serving Architecture Recommendation:</strong> If GPU memory is moderately tight, start with <strong>Scalar QAT (INT8)</strong> to keep inference fast with zero metric degradation. If memory is extremely constrained (millions of objects), use <strong>SpectralQuant</strong> or <strong>End-to-End PQ</strong> to maximize accuracy under tight sub-byte compression.
+            <strong>Serving Architecture Recommendation:</strong> Empirically, <strong>Product Quantization (PQ / E2E PQ)</strong> delivers the best trade-off, restricting recall drop to ~1%. Scalar methods (PTQ/QAT) degrade recall by ~10% due to loss of vector directionality. For extreme compression budgets, <strong>TurboQuant / SpectralQuant</strong> squeeze embeddings up to 97% while preserving more structure than scalar options.
           </div>
         </div>
       </section>

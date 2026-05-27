@@ -469,11 +469,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle slide transition actions (e.g. restarting simulations)
   function handleSlideTransitions(slideIndex) {
-    if (slideIndex === 1) {
+    if (slideIndex === 2) {
       updateMemoryCalculator();
-    } else if (slideIndex === 2) {
+    } else if (slideIndex === 3) {
       updateScalarQuantSim();
-    } else if (slideIndex === 7) {
+    } else if (slideIndex === 8) {
       // Re-trigger/resize rotation canvas
       setTimeout(() => {
         if (canvas) {
