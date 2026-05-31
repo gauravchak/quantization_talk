@@ -102,6 +102,82 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
+  // === INTERACTIVE WIDGET 0: RECOMMENDER SYSTEM FUNNEL ===
+  const funnelStages = document.querySelectorAll('.funnel-stage');
+  const funnelDetails = document.getElementById('funnel-details');
+  const funnelCompute = document.getElementById('funnel-compute');
+  const funnelSupervision = document.getElementById('funnel-supervision');
+  const funnelDesc = document.querySelector('.funnel-details-desc');
+  
+  const funnelData = {
+    retrieval: {
+      title: "Retrieval Stage",
+      compute: "Fast Embed Search (Approx. Nearest Neighbors, O(1) ops per item)",
+      supervision: "10 : Billions (Extremely Biased)",
+      loss: "Softmax Loss / Sampled Negatives",
+      latency: "< 5-10 ms",
+      desc: "Narrows down the entire candidate space from billions of items to a few thousand candidates. Operates under extreme latency bounds, relying on lightweight mathematical representations (MIPS/ANN).",
+      borderColor: "rgba(45, 212, 191, 0.2)",
+      titleColor: "var(--accent-teal)"
+    },
+    esr: {
+      title: "Early-Stage Ranking (ESR)",
+      compute: "Lightweight Model (Shallow MLP or Dot Product + Neural network)",
+      supervision: "10 : 3,000 (Highly Biased)",
+      loss: "Hybrid (BCE + Softmax + Rank-Order Alignment)",
+      latency: "< 5-10 ms",
+      desc: "Prunes candidate pool under tight latency limits. Trains on a hybrid objective: BCE on impressions, Softmax on sampled negatives, and rank-order alignment from downstream LSR scores.",
+      borderColor: "rgba(56, 189, 248, 0.2)",
+      titleColor: "var(--accent-blue)"
+    },
+    lsr: {
+      title: "Late-Stage Ranking (LSR)",
+      compute: "Heavy Model (Deep Cross Networks, Multi-task Neural network)",
+      supervision: "10 : 300 (Noisy but manageable bias)",
+      loss: "Discriminative BCE (Binary Cross Entropy)",
+      latency: "20 - 50 ms",
+      desc: "Computes rich feature cross interactions (user history, contextual tags, real-time feedback) on the top candidates to predict exact interaction probabilities.",
+      borderColor: "rgba(167, 139, 250, 0.2)",
+      titleColor: "var(--accent-purple)"
+    },
+    impressions: {
+      title: "Impressions Stage",
+      compute: "Client-side / Layout optimization & business rules",
+      supervision: "N/A (Impressed subset)",
+      loss: "User Interaction Feedback",
+      latency: "N/A",
+      desc: "The final few items displayed to the user. Typically under 10 items (often just 1). The actual items the user can interact with, generating the sparse labels used to train the entire system.",
+      borderColor: "rgba(251, 146, 60, 0.2)",
+      titleColor: "var(--accent-orange)"
+    }
+  };
+
+  function selectFunnelStage(stageKey) {
+    const data = funnelData[stageKey];
+    if (!data) return;
+
+    // Toggle active classes
+    funnelStages.forEach(stage => {
+      stage.classList.toggle('active', stage.dataset.stage === stageKey);
+    });
+
+    // Update details card content
+    const titleEl = funnelDetails.querySelector('.funnel-details-title');
+    titleEl.textContent = data.title;
+    titleEl.style.color = data.titleColor;
+    funnelDetails.style.borderColor = data.borderColor;
+
+    funnelCompute.textContent = data.compute;
+    funnelSupervision.textContent = data.supervision;
+    funnelDesc.textContent = data.desc;
+  }
+
+  funnelStages.forEach(stage => {
+    stage.addEventListener('click', () => {
+      selectFunnelStage(stage.dataset.stage);
+    });
+  });
+
   // === INTERACTIVE WIDGET 1: GPU MEMORY CALCULATOR ===
   const vocabInput = document.getElementById('calc-vocab');
   const dimInput = document.getElementById('calc-dim');
@@ -469,11 +545,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle slide transition actions (e.g. restarting simulations)
   function handleSlideTransitions(slideIndex) {
-    if (slideIndex === 2) {
+    if (slideIndex === 1) {
+      // Initialize funnel selection
+      selectFunnelStage('esr');
+    } else if (slideIndex === 4) {
       updateMemoryCalculator();
-    } else if (slideIndex === 3) {
+    } else if (slideIndex === 5) {
       updateScalarQuantSim();
-    } else if (slideIndex === 8) {
+    } else if (slideIndex === 10) {
       // Re-trigger/resize rotation canvas
       setTimeout(() => {
         if (canvas) {

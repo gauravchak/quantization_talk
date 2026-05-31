@@ -1011,6 +1011,102 @@ table.comp-table td.strong {
 .comment { color: #64748b; font-style: italic; }
 .fn { color: #a78bfa; }
 
+/* Interactive Funnel Visualizer */
+.funnel-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 10px 0;
+}
+
+.funnel-stage {
+  width: 100%;
+  padding: 14px 20px;
+  border-radius: 12px;
+  cursor: pointer;
+  position: relative;
+  transition: var(--transition-smooth);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+}
+
+.funnel-stage[data-stage="retrieval"] {
+  width: 100%;
+  background: linear-gradient(90deg, rgba(45, 212, 191, 0.1) 0%, rgba(45, 212, 191, 0.03) 100%);
+  border-color: rgba(45, 212, 191, 0.15);
+}
+
+.funnel-stage[data-stage="esr"] {
+  width: 85%;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, rgba(56, 189, 248, 0.03) 100%);
+  border-color: rgba(56, 189, 248, 0.15);
+}
+
+.funnel-stage[data-stage="lsr"] {
+  width: 70%;
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.1) 0%, rgba(167, 139, 250, 0.03) 100%);
+  border-color: rgba(167, 139, 250, 0.15);
+}
+
+.funnel-stage[data-stage="impressions"] {
+  width: 55%;
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0.1) 0%, rgba(251, 146, 60, 0.03) 100%);
+  border-color: rgba(251, 146, 60, 0.15);
+}
+
+/* Hover effects */
+.funnel-stage:hover {
+  transform: translateY(-2px) scale(1.02);
+  border-color: rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.3);
+}
+
+/* Active states (clicked / selected) */
+.funnel-stage.active[data-stage="retrieval"] {
+  background: linear-gradient(90deg, rgba(45, 212, 191, 0.25) 0%, rgba(45, 212, 191, 0.05) 100%);
+  border-color: var(--accent-teal);
+  box-shadow: 0 0 20px rgba(45, 212, 191, 0.3);
+}
+
+.funnel-stage.active[data-stage="esr"] {
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.25) 0%, rgba(56, 189, 248, 0.05) 100%);
+  border-color: var(--accent-blue);
+  box-shadow: 0 0 20px rgba(56, 189, 248, 0.3);
+}
+
+.funnel-stage.active[data-stage="lsr"] {
+  background: linear-gradient(90deg, rgba(167, 139, 250, 0.25) 0%, rgba(167, 139, 250, 0.05) 100%);
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 20px rgba(167, 139, 250, 0.3);
+}
+
+.funnel-stage.active[data-stage="impressions"] {
+  background: linear-gradient(90deg, rgba(251, 146, 60, 0.25) 0%, rgba(251, 146, 60, 0.05) 100%);
+  border-color: var(--accent-orange);
+  box-shadow: 0 0 20px rgba(251, 146, 60, 0.3);
+}
+
+.funnel-stage-name {
+  font-weight: 600;
+  font-size: 14px;
+  font-family: var(--font-heading);
+}
+
+.funnel-stage-size {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.funnel-details-card {
+  transition: border-color 0.4s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
 /* Responsive adjustments */
 @media (max-height: 800px) {
   .slide h1 { font-size: 32px; }
