@@ -122,7 +122,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     esr: {
       title: "Early-Stage Ranking (ESR)",
-      compute: "Lightweight Model (Shallow MLP or Dot Product + Neural network)",
+      compute: "Lightweight Model (Shallow MLP or Dot Product + OverArch)",
       supervision: "10 : 3,000 (Highly Biased)",
       loss: "Hybrid (BCE + Softmax + Rank-Order Alignment)",
       latency: "< 5-10 ms",
@@ -132,7 +132,7 @@ document.addEventListener('DOMContentLoaded', () => {
     },
     lsr: {
       title: "Late-Stage Ranking (LSR)",
-      compute: "Heavy Model (Deep Cross Networks, Multi-task Neural network)",
+      compute: "Heavy Model (Deep Cross Networks, Multi-task OverArch)",
       supervision: "10 : 300 (Noisy but manageable bias)",
       loss: "Discriminative BCE (Binary Cross Entropy)",
       latency: "20 - 50 ms",

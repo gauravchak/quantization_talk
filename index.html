@@ -188,13 +188,14 @@
             <div class="info-badge purple">Training (Offline)</div>
             <ul class="feature-list purple">
               <li><strong>Twin Towers:</strong> Simultaneously learns User and Object embeddings in $D$-dimensional space.</li>
-              <li><strong>Neural network:</strong> Combines tower outputs to generate task predictions, computing training losses.</li>
+              <li><strong>OverArch:</strong> Combines tower outputs to generate task predictions, computing training losses.</li>
             </ul>
             
             <div class="info-badge teal">Disaggregated Serving</div>
             <ul class="feature-list teal">
-              <li><strong>Offline Part:</strong> Item embeddings are pre-computed using the Object Tower and published directly to GPU memory.</li>
-              <li><strong>Online Part:</strong> Runs User features through the User Tower online to get the User embedding, retrieves Object embeddings from GPU memory, and inputs both to the Neural network on-the-fly to output predictions used to rank.</li>
+              <li><strong>Offline Rationale:</strong> Object features change slowly, meaning pre-computing and publishing item embeddings directly to GPU HBM has negligible freshness impact while avoiding $O(\text{candidates})$ online computation scaling.</li>
+              <li><strong>Standard Online Flow:</strong> Online query latency is dominated by User Tower inference. Fetching pre-computed item embeddings from GPU memory and running the vectorized <strong>OverArch</strong> avoids latency scaling linearly with candidate count.</li>
+              <li><strong>Serving Variation (Parallel User Tower):</strong> Fire the online User Tower <em>concurrently</em> alongside Retrieval, caching the User embedding. Once Retrieval returns 3K items, fetch the cached User embedding and run the OverArch. This restricts post-Retrieval latency purely to the vectorized OverArch evaluation!</li>
             </ul>
           </div>
           <div class="visualizer-col">
@@ -202,13 +203,13 @@
               <div class="panel-header">
                 <span class="panel-title">System Execution Flow</span>
               </div>
-              <div class="panel-content" style="display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 10px;">
-                <div class="mermaid" style="width: 100%; height: 100%; min-height: 280px; text-align: center;">
+              <div class="panel-content" style="display: justify-content: center; align-items: center; overflow: hidden; padding: 10px;">
+                <div class="mermaid" style="width: 100%; height: 100%; min-height: 290px; text-align: center;">
 graph TD
     subgraph "Training (Offline)"
-        UT1[User Tower] -->|User embedding| NN1[Neural network]
-        OT1[Object Tower] -->|Object embedding| NN1
-        NN1 -->|Task predictions| L[Losses]
+        UT1[User Tower] -->|User embedding| OA1[OverArch]
+        OT1[Object Tower] -->|Object embedding| OA1
+        OA1 -->|Task predictions| L[Losses]
     end
 
     subgraph "Disaggregated Serving"
@@ -216,17 +217,25 @@ graph TD
             OT2[Object Tower] -->|Offline publish| MEM[(GPU Memory)]
         end
 
-        subgraph "Online Part"
-            UF[User features] --> UT2[User Tower]
-            UT2 -->|User embedding| NN2[Neural network]
-            MEM -->|Object embeddings| NN2
-            NN2 -->|Predictions| R[Predictions used to rank]
+        subgraph "Online Part (Parallel Variation)"
+            UF[User features] -->|Trigger concurrently| UT2[User Tower]
+            UF -->|Trigger concurrently| RET[Retrieval Stage]
+            
+            UT2 -->|User embedding| CACHE(Cache)
+            RET -->|3K candidates| FETCH[Fetch candidate embeddings]
+            MEM -->|Retrieve| FETCH
+            
+            FETCH -->|Candidate embeddings| OA2[OverArch]
+            CACHE -->|Cached User embedding| OA2
+            
+            OA2 -->|Vectorized GPU scoring| R[Predictions used to rank]
         end
     end
 
-    style NN1 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
-    style NN2 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
+    style OA1 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
+    style OA2 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
     style MEM fill:#0f766e,stroke:#2dd4bf,stroke-width:1.5px
+    style CACHE fill:#854d0e,stroke:#eab308,stroke-width:1.5px
                 </div>
               </div>
             </div>
