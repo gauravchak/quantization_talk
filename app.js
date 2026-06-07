@@ -654,12 +654,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // === INTERACTIVE WIDGET 3: PRODUCT QUANTIZATION VISUALIZER ===
   const pqStepBtn = document.getElementById('pq-step-btn');
+  const pqErrorBtn = document.getElementById('pq-error-btn');
   const pqExplanation = document.getElementById('pq-explanation');
   const vectorContainer = document.getElementById('vector-container');
   
   // Set of 8 dimension values for demonstrating PQ
   const initialVector = [0.85, -0.42, 0.12, 0.94, -0.63, 0.78, 0.05, -0.19];
-  let pqStep = 0;
+  let pqStep = -1; // Set to -1 so that the initial advancePQVisualizer call sets it to 0 (Step 1)
+  let showPqError = false;
   
   function generateVectorHTML(vals, highlightMode = null) {
     return vals.map((v, i) => {
@@ -702,6 +704,12 @@ document.addEventListener('DOMContentLoaded', () => {
   
   function advancePQVisualizer() {
     pqStep = (pqStep + 1) % 4;
+    showPqError = false;
+    
+    if (pqErrorBtn) {
+      pqErrorBtn.style.display = 'none';
+      pqErrorBtn.textContent = 'Show Error Details';
+    }
     
     if (pqStep === 0) {
       vectorContainer.innerHTML = generateVectorHTML(initialVector);
@@ -719,13 +727,76 @@ document.addEventListener('DOMContentLoaded', () => {
       vectorContainer.innerHTML = generateVectorHTML(initialVector, 'reconstructed');
       pqExplanation.innerHTML = "<strong>Step 4: Reconstruction (De-quantization)</strong><br>For inference dot product calculation, reconstruct using centroid values. Notice the small quantization error compared to original values.";
       pqStepBtn.textContent = "Reset Visualizer";
+      if (pqErrorBtn) {
+        pqErrorBtn.style.display = 'inline-block';
+      }
     }
+  }
+
+  function renderPqErrorDetails() {
+    const centroids = [
+      [0.80, -0.40],
+      [0.10, 0.90],
+      [-0.60, 0.80],
+      [0.00, -0.20]
+    ];
+    
+    const origHtml = generateVectorHTML(initialVector);
+    
+    const reconVals = [];
+    for (let i = 0; i < 8; i++) {
+      const group = Math.floor(i / 2);
+      reconVals.push(centroids[group][i % 2]);
+    }
+    const reconHtml = generateVectorHTML(reconVals, 'reconstructed');
+    
+    const errorHtml = initialVector.map((v, i) => {
+      const err = Math.abs(v - reconVals[i]);
+      // Map error magnitude 0.01 - 0.05 to opacity 0.15 - 0.6
+      const alpha = 0.15 + (err - 0.01) * (0.45 / 0.04);
+      return `<div class="vector-dimension" style="background: rgba(248, 113, 113, ${alpha}); border: 1.5px solid rgba(248, 113, 113, 0.4); color: var(--accent-red); font-weight: bold; width: 32px; height: 32px; border-radius: 4px; display: flex; align-items: center; justify-content: center; font-size: 11px;">${err.toFixed(2)}</div>`;
+    }).join('');
+    
+    pqExplanation.innerHTML = "<strong>Reconstruction Error Details</strong><br>Mean Squared Error (MSE) is just <strong>0.0011</strong>. Proportional red intensity shows the distortion level per dimension.";
+    
+    vectorContainer.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 10px; width: 100%; text-align: left; padding: 5px 0;">
+        <div style="display: flex; flex-direction: column; gap: 4px;">
+          <span style="font-size: 11px; font-weight: bold; color: var(--text-secondary);">Original Float Vector:</span>
+          <div style="display: flex; gap: 8px; justify-content: center;">${origHtml}</div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+          <span style="font-size: 11px; font-weight: bold; color: var(--accent-blue);">Reconstructed Centroids:</span>
+          <div style="display: flex; gap: 8px; justify-content: center;">${reconHtml}</div>
+        </div>
+        
+        <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+          <span style="font-size: 11px; font-weight: bold; color: var(--accent-red);">Absolute Quantization Error (&Delta;):</span>
+          <div style="display: flex; gap: 8px; justify-content: center;">${errorHtml}</div>
+        </div>
+      </div>
+    `;
   }
   
   if (pqStepBtn) {
     pqStepBtn.addEventListener('click', advancePQVisualizer);
     // Init state
     advancePQVisualizer();
+  }
+
+  if (pqErrorBtn) {
+    pqErrorBtn.addEventListener('click', () => {
+      showPqError = !showPqError;
+      if (showPqError) {
+        pqErrorBtn.textContent = 'Hide Error Details';
+        renderPqErrorDetails();
+      } else {
+        pqErrorBtn.textContent = 'Show Error Details';
+        vectorContainer.innerHTML = generateVectorHTML(initialVector, 'reconstructed');
+        pqExplanation.innerHTML = "<strong>Step 4: Reconstruction (De-quantization)</strong><br>For inference dot product calculation, reconstruct using centroid values. Notice the small quantization error compared to original values.";
+      }
+    });
   }
 
   // === INTERACTIVE WIDGET 4: ROTATION CANVAS VISUALIZER (TURBO vs SPECTRAL) ===
