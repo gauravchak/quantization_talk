@@ -42,7 +42,7 @@
         <div class="progress-bar-bg">
           <div class="progress-bar-fill"></div>
         </div>
-        <div class="progress-text">1 / 12</div>
+        <div class="progress-text">1 / 13</div>
       </div>
     </header>
 
@@ -193,9 +193,9 @@
             
             <div class="info-badge teal">Disaggregated Serving</div>
             <ul class="feature-list teal">
-              <li><strong>Offline Rationale:</strong> Object features change slowly, meaning pre-computing and publishing item embeddings directly to GPU HBM has negligible freshness impact while avoiding $O(\text{candidates})$ online computation scaling.</li>
-              <li><strong>Standard Online Flow:</strong> Online query latency is dominated by User Tower inference. Fetching pre-computed item embeddings from GPU memory and running the vectorized <strong>OverArch</strong> avoids latency scaling linearly with candidate count.</li>
-              <li><strong>Serving Variation (Parallel User Tower):</strong> Fire the online User Tower <em>concurrently</em> alongside Retrieval, caching the User embedding. Once Retrieval returns 3K items, fetch the cached User embedding and run the OverArch. This restricts post-Retrieval latency purely to the vectorized OverArch evaluation!</li>
+              <li><strong>Offline Part:</strong> Item embeddings are pre-computed using the Object Tower and published directly to GPU memory.</li>
+              <li><strong>Offline Rationale:</strong> Object features change slowly (domain-dependent), so offline pre-computation has minimal freshness impact while avoiding $O(\text{candidates})$ online computation scaling.</li>
+              <li><strong>Online Part:</strong> Runs User features through the User Tower online to get the User embedding, retrieves Object embeddings from GPU memory, and inputs both to the OverArch on-the-fly to output predictions used to rank.</li>
             </ul>
           </div>
           <div class="visualizer-col">
@@ -203,8 +203,8 @@
               <div class="panel-header">
                 <span class="panel-title">System Execution Flow</span>
               </div>
-              <div class="panel-content" style="display: justify-content: center; align-items: center; overflow: hidden; padding: 10px;">
-                <div class="mermaid" style="width: 100%; height: 100%; min-height: 290px; text-align: center;">
+              <div class="panel-content" style="display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 10px;">
+                <div class="mermaid" style="width: 100%; height: 100%; min-height: 250px; text-align: center;">
 graph TD
     subgraph "Training (Offline)"
         UT1[User Tower] -->|User embedding| OA1[OverArch]
@@ -217,26 +217,91 @@ graph TD
             OT2[Object Tower] -->|Offline publish| MEM[(GPU Memory)]
         end
 
-        subgraph "Online Part (Parallel Variation)"
-            UF[User features] -->|Trigger concurrently| UT2[User Tower]
-            UF -->|Trigger concurrently| RET[Retrieval Stage]
-            
-            UT2 -->|User embedding| CACHE(Cache)
-            RET -->|3K candidates| FETCH[Fetch candidate embeddings]
-            MEM -->|Retrieve| FETCH
-            
-            FETCH -->|Candidate embeddings| OA2[OverArch]
-            CACHE -->|Cached User embedding| OA2
-            
-            OA2 -->|Vectorized GPU scoring| R[Predictions used to rank]
+        subgraph "Online Part"
+            UF[User features] --> UT2[User Tower]
+            UT2 -->|User embedding| OA2[OverArch]
+            MEM -->|Object embeddings| OA2
+            OA2 -->|Predictions| R[Predictions used to rank]
         end
     end
 
     style OA1 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
     style OA2 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
     style MEM fill:#0f766e,stroke:#2dd4bf,stroke-width:1.5px
-    style CACHE fill:#854d0e,stroke:#eab308,stroke-width:1.5px
                 </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- SLIDE 5: Serving Variation -->
+      <section class="slide" id="slide-serving-variation">
+        <div class="slide-header">
+          <span class="slide-tag">04. Serving Variation</span>
+          <h2>Latency Hiding: Parallel User Tower Execution</h2>
+        </div>
+        <div class="slide-content-grid">
+          <div class="narrative-col">
+            <p>Normally, ESR scoring runs sequentially after candidate retrieval. However, we can optimize latency by parallelizing User Tower execution.</p>
+            
+            <div class="info-badge purple">Online Latency characteristics</div>
+            <p>Online serving time is typically dominated by the User Tower MLP inference ($T_{\text{User Tower}} \approx 5\text{ms}$), while candidate retrieval also takes time ($T_{\text{Retrieval}} \approx 8\text{ms}$).</p>
+            
+            <div class="info-badge teal">The Parallel Optimization</div>
+            <ul class="feature-list teal">
+              <li><strong>Concurrent Trigger:</strong> Fire the online User Tower <em>at the same time</em> candidate retrieval is called.</li>
+              <li><strong>Caching:</strong> Store the resulting User embedding in a fast online cache.</li>
+              <li><strong>Hiding Latency:</strong> When Retrieval completes, fetch the cached User embedding. The post-Retrieval path is now restricted <strong>solely</strong> to the vectorized OverArch evaluation ($T_{\text{OverArch}} \approx 2\text{ms}$).</li>
+            </ul>
+          </div>
+          <div class="visualizer-col">
+            <div class="visualizer-panel">
+              <div class="panel-header">
+                <span class="panel-title">Latency Timeline Simulator (X-Axis: Time in ms)</span>
+              </div>
+              <div class="panel-content timeline-panel-content" style="display: flex; flex-direction: column; gap: 15px; justify-content: flex-start; align-items: stretch; padding: 15px;">
+                
+                <!-- Play button -->
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                  <button class="pq-visualizer-step-btn" id="play-timeline-btn" style="margin: 0; padding: 8px 16px; font-size: 12px; max-width: 150px;">Play Animation</button>
+                  <div id="timeline-savings" style="font-family: var(--font-mono); font-size: 12px; color: var(--accent-teal); font-weight: bold; opacity: 0; transition: opacity 0.3s;">Saved: 5ms (33% Reduction!)</div>
+                </div>
+
+                <!-- Timeline Visualizer Container -->
+                <div class="timeline-visualizer" style="position: relative; margin-top: 10px; width: 100%;">
+                  <!-- Sequential Row -->
+                  <div class="timeline-row-title" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-family: var(--font-heading);">Sequential Execution (No latency hiding)</div>
+                  <div class="timeline-track" id="track-sequential" style="display: flex; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--glass-border); height: 32px; overflow: hidden; width: 100%; position: relative; margin-bottom: 15px;">
+                    <div class="timeline-segment seq-retrieval" style="width: 53.3%; background: rgba(45, 212, 191, 0.15); color: var(--accent-teal); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border-right: 1px solid rgba(45, 212, 191, 0.2); transition: width 1s ease-out;">Retrieval (8ms)</div>
+                    <div class="timeline-segment seq-user-tower" style="width: 33.3%; background: rgba(167, 139, 250, 0.15); color: var(--accent-purple); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; border-right: 1px solid rgba(167, 139, 250, 0.2); transition: width 1s ease-out;">User Tower (5ms)</div>
+                    <div class="timeline-segment seq-overarch" style="width: 13.4%; background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; transition: width 1s ease-out;">OverArch (2ms)</div>
+                  </div>
+
+                  <!-- Parallel Row -->
+                  <div class="timeline-row-title" style="font-size: 12px; color: var(--text-secondary); margin-bottom: 6px; font-family: var(--font-heading);">Parallel Execution (User Tower hidden)</div>
+                  <div class="timeline-track" id="track-parallel" style="display: flex; background: rgba(255,255,255,0.03); border-radius: 8px; border: 1px solid var(--glass-border); height: 60px; overflow: hidden; width: 100%; position: relative; margin-bottom: 25px;">
+                    <div class="timeline-parallel-group" style="width: 53.3%; display: flex; flex-direction: column; justify-content: space-between; padding: 4px 0; height: 100%; border-right: 1px dashed rgba(255,255,255,0.15); position: relative;">
+                      <div class="timeline-segment par-retrieval" style="width: 100%; height: 22px; background: rgba(45, 212, 191, 0.15); color: var(--accent-teal); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border-radius: 4px; border: 1px solid rgba(45, 212, 191, 0.1);">Retrieval (8ms)</div>
+                      <div class="timeline-segment par-user-tower" style="width: 62.5%; height: 22px; background: rgba(167, 139, 250, 0.15); color: var(--accent-purple); display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: bold; border-radius: 4px; border: 1px solid rgba(167, 139, 250, 0.1);">User Tower (5ms)</div>
+                    </div>
+                    <div class="timeline-segment par-overarch" style="width: 13.3%; background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: bold; height: 100%; border-right: 1px dashed rgba(255,255,255,0.15); transition: width 1s ease-out;">OverArch (2ms)</div>
+                    <div class="timeline-segment par-saved" style="width: 33.4%; background: rgba(45, 212, 191, 0.05); color: var(--accent-teal); display: flex; align-items: center; justify-content: center; font-size: 11px; font-style: italic;">Saved: 5ms (33%)</div>
+                  </div>
+                  
+                  <!-- X-Axis Labels -->
+                  <div class="timeline-axis" style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--text-muted); border-top: 1px solid rgba(255,255,255,0.1); padding-top: 6px; width: 100%;">
+                    <span>0ms</span>
+                    <span>5ms</span>
+                    <span>8ms</span>
+                    <span>10ms</span>
+                    <span>15ms</span>
+                  </div>
+                  
+                  <!-- Playback Line -->
+                  <div id="playback-line" style="position: absolute; top: 20px; left: 0%; bottom: 18px; width: 2px; background: var(--accent-orange); opacity: 0; pointer-events: none; box-shadow: 0 0 10px var(--accent-orange); transition: left 0.1s linear, opacity 0.2s;"></div>
+                </div>
+
               </div>
             </div>
           </div>
@@ -246,7 +311,7 @@ graph TD
       <!-- SLIDE 5: Serving Bottleneck -->
       <section class="slide" id="slide-2">
         <div class="slide-header">
-          <span class="slide-tag">04. Serving Bottleneck</span>
+          <span class="slide-tag">05. Serving Bottleneck</span>
           <h2>Moving Early Stage Ranking (ESR) to GPU Serving</h2>
         </div>
         <div class="slide-content-grid">
@@ -315,7 +380,7 @@ graph TD
       <!-- SLIDE 6: Scalar Quantization (PTQ) -->
       <section class="slide" id="slide-3">
         <div class="slide-header">
-          <span class="slide-tag">05. Linear Quantization</span>
+          <span class="slide-tag">06. Linear Quantization</span>
           <h2>Scalar Quantization & Offline Metrics</h2>
         </div>
         <div class="slide-content-grid">
@@ -376,7 +441,7 @@ graph TD
       <!-- SLIDE 7: Quantization Aware Training (QAT) -->
       <section class="slide" id="slide-4">
         <div class="slide-header">
-          <span class="slide-tag">06. Active Mitigation</span>
+          <span class="slide-tag">07. Active Mitigation</span>
           <h2>Quantization-Aware Training (QAT)</h2>
         </div>
         <div class="slide-content-full">
@@ -411,7 +476,7 @@ graph TD
       <!-- SLIDE 8: Product Quantization (PQ) -->
       <section class="slide" id="slide-5">
         <div class="slide-header">
-          <span class="slide-tag">07. Vector Clustering</span>
+          <span class="slide-tag">08. Vector Clustering</span>
           <h2>Product Quantization (PQ)</h2>
         </div>
         <div class="slide-content-grid">
@@ -449,7 +514,7 @@ graph TD
       <!-- SLIDE 9: End-to-End Trained Product Quantization (E2E PQ) -->
       <section class="slide" id="slide-6">
         <div class="slide-header">
-          <span class="slide-tag">08. Differentiable Clustering</span>
+          <span class="slide-tag">09. Differentiable Clustering</span>
           <h2>End-to-End Trained PQ</h2>
         </div>
         <div class="slide-content-full">
@@ -483,7 +548,7 @@ graph TD
       <!-- SLIDE 10: TurboQuant -->
       <section class="slide" id="slide-7">
         <div class="slide-header">
-          <span class="slide-tag">09. Variance Balancing</span>
+          <span class="slide-tag">10. Variance Balancing</span>
           <h2>TurboQuant</h2>
         </div>
         <div class="slide-content-full">
@@ -508,7 +573,7 @@ graph TD
       <!-- SLIDE 11: SpectralQuant -->
       <section class="slide" id="slide-8">
         <div class="slide-header">
-          <span class="slide-tag">10. Optimal Rotation & SVD</span>
+          <span class="slide-tag">11. Optimal Rotation & SVD</span>
           <h2>SpectralQuant</h2>
         </div>
         <div class="slide-content-grid">

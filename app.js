@@ -218,6 +218,117 @@ document.addEventListener('DOMContentLoaded', () => {
     dimInput.addEventListener('input', updateMemoryCalculator);
   }
 
+  // === INTERACTIVE WIDGET: LATENCY TIMELINE SIMULATOR ===
+  const playTimelineBtn = document.getElementById('play-timeline-btn');
+  const playbackLine = document.getElementById('playback-line');
+  const savingsBanner = document.getElementById('timeline-savings');
+  
+  const segments = [
+    { selector: '.seq-retrieval', start: 0, end: 8 },
+    { selector: '.seq-user-tower', start: 8, end: 13 },
+    { selector: '.seq-overarch', start: 13, end: 15 },
+    { selector: '.par-retrieval', start: 0, end: 8 },
+    { selector: '.par-user-tower', start: 0, end: 5 },
+    { selector: '.par-overarch', start: 8, end: 10 },
+    { selector: '.par-saved', start: 10, end: 15 }
+  ];
+
+  let timelineAnimationId = null;
+
+  function resetTimeline() {
+    if (timelineAnimationId) {
+      cancelAnimationFrame(timelineAnimationId);
+      timelineAnimationId = null;
+    }
+    if (playbackLine) {
+      playbackLine.style.opacity = '0';
+      playbackLine.style.left = '0%';
+    }
+    if (savingsBanner) {
+      savingsBanner.style.opacity = '0';
+    }
+    if (playTimelineBtn) {
+      playTimelineBtn.disabled = false;
+      playTimelineBtn.textContent = 'Play Animation';
+    }
+    
+    // Reset all segment highlights
+    segments.forEach(seg => {
+      const el = document.querySelector(seg.selector);
+      if (el) {
+        el.classList.remove('dimmed', 'highlighted');
+      }
+    });
+  }
+
+  function startTimelineAnimation() {
+    resetTimeline();
+    
+    if (!playbackLine || !playTimelineBtn) return;
+    
+    playTimelineBtn.disabled = true;
+    playTimelineBtn.textContent = 'Running...';
+    playbackLine.style.opacity = '1';
+    
+    // Dim all segments initially
+    segments.forEach(seg => {
+      const el = document.querySelector(seg.selector);
+      if (el) {
+        el.classList.add('dimmed');
+      }
+    });
+
+    const duration = 2500; // 2.5 seconds
+    const startTime = performance.now();
+
+    function updateFrame(now) {
+      const elapsed = now - startTime;
+      const progress = Math.min(elapsed / duration, 1);
+      const t = progress * 15; // 0 to 15 ms
+
+      playbackLine.style.left = `${progress * 100}%`;
+
+      // Update highlight state for each segment
+      segments.forEach(seg => {
+        const el = document.querySelector(seg.selector);
+        if (!el) return;
+
+        if (t >= seg.start) {
+          el.classList.remove('dimmed');
+          el.classList.add('highlighted');
+        } else {
+          el.classList.remove('highlighted');
+          el.classList.add('dimmed');
+        }
+      });
+
+      if (progress < 1) {
+        timelineAnimationId = requestAnimationFrame(updateFrame);
+      } else {
+        // Animation complete
+        if (savingsBanner) {
+          savingsBanner.style.opacity = '1';
+        }
+        playTimelineBtn.disabled = false;
+        playTimelineBtn.textContent = 'Replay Animation';
+        timelineAnimationId = null;
+        
+        // Hide play line after a short fade
+        setTimeout(() => {
+          if (!timelineAnimationId && playbackLine) {
+            playbackLine.style.opacity = '0';
+          }
+        }, 800);
+      }
+    }
+
+    timelineAnimationId = requestAnimationFrame(updateFrame);
+  }
+
+  if (playTimelineBtn) {
+    playTimelineBtn.addEventListener('click', startTimelineAnimation);
+  }
+
   // === INTERACTIVE WIDGET 2: SCALAR QUANTIZATION SIMULATOR ===
   const floatSlider = document.getElementById('float-slider');
   const valFloat = document.getElementById('val-float');
@@ -549,10 +660,13 @@ document.addEventListener('DOMContentLoaded', () => {
       // Initialize funnel selection
       selectFunnelStage('esr');
     } else if (slideIndex === 4) {
-      updateMemoryCalculator();
+      // Reset latency timeline when entering Slide 5 (index 4)
+      resetTimeline();
     } else if (slideIndex === 5) {
+      updateMemoryCalculator();
+    } else if (slideIndex === 6) {
       updateScalarQuantSim();
-    } else if (slideIndex === 10) {
+    } else if (slideIndex === 11) {
       // Re-trigger/resize rotation canvas
       setTimeout(() => {
         if (canvas) {
