@@ -218,6 +218,274 @@ document.addEventListener('DOMContentLoaded', () => {
     dimInput.addEventListener('input', updateMemoryCalculator);
   }
 
+  // === INTERACTIVE WIDGET: ARCHITECTURE PHASE VISUALIZER ===
+  const archCanvas = document.getElementById('arch-canvas');
+  const archTabBtns = document.querySelectorAll('.arch-tab-btn');
+  const nodeUserTower = document.getElementById('node-user-tower');
+  const nodeObjectTower = document.getElementById('node-object-tower');
+  const nodeGpuMem = document.getElementById('node-gpu-mem');
+  const nodeOverarch = document.getElementById('node-overarch');
+  const nodeOutputs = document.getElementById('node-outputs');
+  const outputsLabel = document.getElementById('outputs-label');
+
+  let archCtx = null;
+  let archAnimationId = null;
+  let archPhase = 'training'; // training, offline-prep, online-scoring
+  let archDashOffset = 0;
+
+  function initArchVisualizer() {
+    if (!archCanvas) return;
+    archCtx = archCanvas.getContext('2d');
+    
+    // Set initial size
+    resizeArchCanvas();
+    
+    // Add click listeners to tab buttons
+    archTabBtns.forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        setArchPhase(e.currentTarget.dataset.phase);
+      });
+    });
+
+    window.addEventListener('resize', () => {
+      resizeArchCanvas();
+      if (currentSlideIndex === 3) {
+        drawArchFlow();
+      }
+    });
+  }
+
+  function resizeArchCanvas() {
+    if (archCanvas) {
+      archCanvas.width = archCanvas.offsetWidth;
+      archCanvas.height = archCanvas.offsetHeight;
+    }
+  }
+
+  function setArchPhase(phase) {
+    archPhase = phase;
+    
+    // Update active tab button style
+    archTabBtns.forEach(btn => {
+      btn.classList.toggle('active', btn.dataset.phase === phase);
+    });
+
+    // Update node states (active vs greyed out)
+    resetNodeStyles();
+
+    if (phase === 'training') {
+      nodeUserTower.style.opacity = '1';
+      nodeObjectTower.style.opacity = '1';
+      nodeGpuMem.style.opacity = '0.15';
+      nodeGpuMem.style.borderColor = 'var(--glass-border)';
+      nodeOverarch.style.opacity = '1';
+      nodeOutputs.style.opacity = '1';
+      outputsLabel.textContent = 'Losses';
+      outputsLabel.style.color = 'var(--accent-orange)';
+      nodeOutputs.style.borderColor = 'rgba(251, 146, 60, 0.3)';
+    } else if (phase === 'offline-prep') {
+      nodeUserTower.style.opacity = '0.15';
+      nodeObjectTower.style.opacity = '1';
+      nodeGpuMem.style.opacity = '1';
+      nodeGpuMem.style.borderColor = 'var(--accent-blue)';
+      nodeOverarch.style.opacity = '0.15';
+      nodeOutputs.style.opacity = '0.15';
+      nodeOutputs.style.borderColor = 'var(--glass-border)';
+    } else if (phase === 'online-scoring') {
+      nodeUserTower.style.opacity = '1';
+      nodeObjectTower.style.opacity = '0.15';
+      nodeGpuMem.style.opacity = '1';
+      nodeGpuMem.style.borderColor = 'var(--accent-blue)';
+      nodeOverarch.style.opacity = '1';
+      nodeOutputs.style.opacity = '1';
+      outputsLabel.textContent = 'Predictions';
+      outputsLabel.style.color = 'var(--accent-orange)';
+      nodeOutputs.style.borderColor = 'rgba(251, 146, 60, 0.3)';
+    }
+  }
+
+  function resetNodeStyles() {
+    [nodeUserTower, nodeObjectTower, nodeGpuMem, nodeOverarch, nodeOutputs].forEach(node => {
+      if (node) {
+        node.style.transition = 'opacity 0.4s ease, border-color 0.4s ease';
+      }
+    });
+  }
+
+  function getElementCenter(el) {
+    if (!el || !archCanvas) return { x: 0, y: 0 };
+    const rect = el.getBoundingClientRect();
+    const canvasRect = archCanvas.getBoundingClientRect();
+    return {
+      x: (rect.left + rect.right) / 2 - canvasRect.left,
+      y: (rect.top + rect.bottom) / 2 - canvasRect.top,
+      width: rect.width,
+      height: rect.height
+    };
+  }
+
+  function drawConnection(startCenter, endCenter, color, glowColor, showFlow = true) {
+    if (!archCtx) return;
+    
+    // Draw background shadow glow line
+    archCtx.shadowBlur = 8;
+    archCtx.shadowColor = glowColor;
+    archCtx.strokeStyle = color;
+    archCtx.lineWidth = 2.5;
+    
+    archCtx.beginPath();
+    const dx = endCenter.x - startCenter.x;
+    const dy = endCenter.y - startCenter.y;
+    
+    archCtx.moveTo(startCenter.x, startCenter.y);
+    if (Math.abs(dy) > 5) {
+      archCtx.bezierCurveTo(
+        startCenter.x + dx * 0.5, startCenter.y,
+        startCenter.x + dx * 0.5, endCenter.y,
+        endCenter.x, endCenter.y
+      );
+    } else {
+      archCtx.lineTo(endCenter.x, endCenter.y);
+    }
+    archCtx.stroke();
+    
+    // Draw flowing data packets
+    if (showFlow) {
+      archCtx.shadowBlur = 10;
+      archCtx.shadowColor = glowColor;
+      archCtx.strokeStyle = '#ffffff';
+      archCtx.lineWidth = 3;
+      archCtx.setLineDash([8, 15]);
+      archCtx.lineDashOffset = -archDashOffset;
+      
+      archCtx.beginPath();
+      if (Math.abs(dy) > 5) {
+        archCtx.moveTo(startCenter.x, startCenter.y);
+        archCtx.bezierCurveTo(
+          startCenter.x + dx * 0.5, startCenter.y,
+          startCenter.x + dx * 0.5, endCenter.y,
+          endCenter.x, endCenter.y
+        );
+      } else {
+        archCtx.moveTo(startCenter.x, startCenter.y);
+        archCtx.lineTo(endCenter.x, endCenter.y);
+      }
+      archCtx.stroke();
+      
+      // Reset line dash
+      archCtx.setLineDash([]);
+      archCtx.lineDashOffset = 0;
+    }
+    
+    // Reset shadow
+    archCtx.shadowBlur = 0;
+  }
+
+  function drawArchFlow() {
+    if (!archCtx || !archCanvas) return;
+    
+    // Clear canvas
+    archCtx.clearRect(0, 0, archCanvas.width, archCanvas.height);
+    
+    // Update animation offsets
+    archDashOffset = (archDashOffset + 0.6) % 23;
+    
+    // Get element center positions
+    const posUser = getElementCenter(nodeUserTower);
+    const posObject = getElementCenter(nodeObjectTower);
+    const posGpu = getElementCenter(nodeGpuMem);
+    const posOver = getElementCenter(nodeOverarch);
+    const posOut = getElementCenter(nodeOutputs);
+    
+    if (archPhase === 'training') {
+      // Draw User Tower -> OverArch
+      drawConnection(
+        { x: posUser.x + posUser.width / 2, y: posUser.y },
+        { x: posOver.x - posOver.width / 2, y: posOver.y - 15 },
+        'rgba(167, 139, 250, 0.4)',
+        'var(--accent-purple)',
+        true
+      );
+      // Draw Object Tower -> OverArch
+      drawConnection(
+        { x: posObject.x + posObject.width / 2, y: posObject.y },
+        { x: posOver.x - posOver.width / 2, y: posOver.y + 15 },
+        'rgba(45, 212, 191, 0.4)',
+        'var(--accent-teal)',
+        true
+      );
+      // Draw OverArch -> Losses
+      drawConnection(
+        { x: posOver.x + posOver.width / 2, y: posOver.y },
+        { x: posOut.x - posOut.width / 2, y: posOut.y },
+        'rgba(251, 146, 60, 0.4)',
+        'var(--accent-orange)',
+        true
+      );
+    } else if (archPhase === 'offline-prep') {
+      // Draw Object Tower -> GPU Memory
+      drawConnection(
+        { x: posObject.x + posObject.width / 2, y: posObject.y },
+        { x: posGpu.x - posGpu.width / 2, y: posGpu.y },
+        'rgba(45, 212, 191, 0.4)',
+        'var(--accent-teal)',
+        true
+      );
+    } else if (archPhase === 'online-scoring') {
+      // Draw User Tower -> OverArch
+      drawConnection(
+        { x: posUser.x + posUser.width / 2, y: posUser.y },
+        { x: posOver.x - posOver.width / 2, y: posOver.y - 15 },
+        'rgba(167, 139, 250, 0.4)',
+        'var(--accent-purple)',
+        true
+      );
+      // Draw GPU Memory -> OverArch
+      drawConnection(
+        { x: posGpu.x + posGpu.width / 2, y: posGpu.y },
+        { x: posOver.x - posOver.width / 2, y: posOver.y + 15 },
+        'rgba(56, 189, 248, 0.4)',
+        'var(--accent-blue)',
+        true
+      );
+      // Draw OverArch -> Predictions
+      drawConnection(
+        { x: posOver.x + posOver.width / 2, y: posOver.y },
+        { x: posOut.x - posOut.width / 2, y: posOut.y },
+        'rgba(251, 146, 60, 0.4)',
+        'var(--accent-orange)',
+        true
+      );
+    }
+  }
+
+  function startArchLoop() {
+    if (archAnimationId) return;
+    
+    // Set initial active phase and styles
+    setArchPhase(archPhase);
+    
+    // Make sure dimensions are calculated
+    resizeArchCanvas();
+    
+    function loop() {
+      drawArchFlow();
+      archAnimationId = requestAnimationFrame(loop);
+    }
+    loop();
+  }
+
+  function stopArchLoop() {
+    if (archAnimationId) {
+      cancelAnimationFrame(archAnimationId);
+      archAnimationId = null;
+    }
+  }
+
+  if (archCanvas) {
+    initArchVisualizer();
+  }
+
   // === INTERACTIVE WIDGET: LATENCY TIMELINE SIMULATOR ===
   const playTimelineBtn = document.getElementById('play-timeline-btn');
   const playbackLine = document.getElementById('playback-line');
@@ -656,9 +924,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Handle slide transition actions (e.g. restarting simulations)
   function handleSlideTransitions(slideIndex) {
+    // Stop arch loop by default, start it if slideIndex === 3
+    stopArchLoop();
+    
     if (slideIndex === 1) {
       // Initialize funnel selection
       selectFunnelStage('esr');
+    } else if (slideIndex === 3) {
+      startArchLoop();
     } else if (slideIndex === 4) {
       // Reset latency timeline when entering Slide 5 (index 4)
       resetTimeline();

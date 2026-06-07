@@ -200,34 +200,51 @@
           </div>
           <div class="visualizer-col">
             <div class="visualizer-panel">
-              <div class="panel-header">
+              <div class="panel-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
                 <span class="panel-title">System Execution Flow</span>
+                <div class="arch-selector" style="display: flex; gap: 4px; background: rgba(0,0,0,0.2); padding: 2px; border-radius: 6px; border: 1px solid var(--glass-border);">
+                  <button class="pq-visualizer-step-btn arch-tab-btn active" data-phase="training" style="margin: 0; padding: 4px 8px; font-size: 11px; border-radius: 4px;">Training</button>
+                  <button class="pq-visualizer-step-btn arch-tab-btn" data-phase="offline-prep" style="margin: 0; padding: 4px 8px; font-size: 11px; border-radius: 4px;">Offline Prep</button>
+                  <button class="pq-visualizer-step-btn arch-tab-btn" data-phase="online-scoring" style="margin: 0; padding: 4px 8px; font-size: 11px; border-radius: 4px;">Online Serving</button>
+                </div>
               </div>
-              <div class="panel-content" style="display: flex; justify-content: center; align-items: center; overflow: hidden; padding: 10px;">
-                <div class="mermaid" style="width: 100%; height: 100%; min-height: 250px; text-align: center;">
-graph TD
-    subgraph "Training (Offline)"
-        UT1[User Tower] -->|User embedding| OA1[OverArch]
-        OT1[Object Tower] -->|Object embedding| OA1
-        OA1 -->|Task predictions| L[Losses]
-    end
+              <div class="panel-content arch-visualizer-panel" style="position: relative; height: 320px; overflow: hidden; padding: 15px; display: flex; justify-content: center; align-items: center;">
+                <canvas id="arch-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;"></canvas>
+                
+                <div class="arch-nodes-container" style="position: relative; width: 100%; height: 100%; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
+                  
+                  <!-- Left column: inputs / towers -->
+                  <div class="arch-col-left" style="display: flex; flex-direction: column; gap: 40px; align-items: flex-start; width: 120px;">
+                    <div class="arch-node" id="node-user-tower" style="background: rgba(167, 139, 250, 0.1); border: 1.5px solid var(--accent-purple); border-radius: 8px; padding: 10px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(167, 139, 250, 0.1); transition: all 0.3s ease;">
+                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">User Tower</div>
+                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-purple);">User MLP</div>
+                    </div>
+                    <div class="arch-node" id="node-object-tower" style="background: rgba(45, 212, 191, 0.1); border: 1.5px solid var(--accent-teal); border-radius: 8px; padding: 10px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(45, 212, 191, 0.1); transition: all 0.3s ease;">
+                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Object Tower</div>
+                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-teal);">Object MLP</div>
+                    </div>
+                  </div>
 
-    subgraph "Disaggregated Serving"
-        subgraph "Offline Part"
-            OT2[Object Tower] -->|Offline publish| MEM[(GPU Memory)]
-        end
+                  <!-- Middle column: intermediate storage / embeddings -->
+                  <div class="arch-col-middle" style="display: flex; flex-direction: column; gap: 40px; align-items: center; width: 120px; position: relative;">
+                    <div class="arch-node" id="node-gpu-mem" style="background: rgba(56, 189, 248, 0.05); border: 1.5px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(56, 189, 248, 0.05);">
+                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">GPU HBM</div>
+                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-blue);">Embeddings</div>
+                    </div>
+                  </div>
 
-        subgraph "Online Part"
-            UF[User features] --> UT2[User Tower]
-            UT2 -->|User embedding| OA2[OverArch]
-            MEM -->|Object embeddings| OA2
-            OA2 -->|Predictions| R[Predictions used to rank]
-        end
-    end
+                  <!-- Right column: OverArch / predictions -->
+                  <div class="arch-col-right" style="display: flex; flex-direction: column; gap: 40px; align-items: flex-end; width: 120px;">
+                    <div class="arch-node" id="node-overarch" style="background: rgba(248, 250, 252, 0.03); border: 1.5px solid var(--glass-border); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease;">
+                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Scoring</div>
+                      <div style="font-size: 11px; font-weight: bold; color: var(--text-primary);">OverArch</div>
+                    </div>
+                    <div class="arch-node" id="node-outputs" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease;">
+                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Target</div>
+                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-orange);" id="outputs-label">Losses</div>
+                    </div>
+                  </div>
 
-    style OA1 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
-    style OA2 fill:#1e1b4b,stroke:#a78bfa,stroke-width:1.5px
-    style MEM fill:#0f766e,stroke:#2dd4bf,stroke-width:1.5px
                 </div>
               </div>
             </div>
