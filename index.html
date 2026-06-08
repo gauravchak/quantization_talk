@@ -233,19 +233,23 @@
                     </div>
                   </div>
 
-                  <!-- Column 3: Computation -->
-                  <div class="arch-col-3" style="display: flex; justify-content: center; align-items: center; width: 95px;">
+                  <!-- Column 3: Computation & Losses -->
+                  <div class="arch-col-3" style="display: flex; flex-direction: column; gap: 30px; align-items: center; width: 95px;">
                     <div class="arch-node" id="node-overarch" style="background: rgba(248, 250, 252, 0.03); border: 1.5px solid var(--glass-border); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease;">
                       <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Scoring</div>
                       <div style="font-size: 10px; font-weight: bold; color: var(--text-primary);">OverArch</div>
                     </div>
+                    <div class="arch-node" id="node-losses" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(251, 146, 60, 0.05);">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Target</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-orange);">Losses</div>
+                    </div>
                   </div>
 
-                  <!-- Column 4: Outputs -->
+                  <!-- Column 4: Predictions (Serving Output) -->
                   <div class="arch-col-4" style="display: flex; justify-content: center; align-items: center; width: 95px;">
-                    <div class="arch-node" id="node-outputs" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease;">
+                    <div class="arch-node" id="node-predictions" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(251, 146, 60, 0.05);">
                       <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Target</div>
-                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-orange);" id="outputs-label">Losses</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-orange);">Predictions</div>
                     </div>
                   </div>
 

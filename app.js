@@ -225,8 +225,8 @@ document.addEventListener('DOMContentLoaded', () => {
   const nodeObjectTower = document.getElementById('node-object-tower');
   const nodeGpuMem = document.getElementById('node-gpu-mem');
   const nodeOverarch = document.getElementById('node-overarch');
-  const nodeOutputs = document.getElementById('node-outputs');
-  const outputsLabel = document.getElementById('outputs-label');
+  const nodeLosses = document.getElementById('node-losses');
+  const nodePredictions = document.getElementById('node-predictions');
 
   let archCtx = null;
   let archAnimationId = null;
@@ -279,33 +279,34 @@ document.addEventListener('DOMContentLoaded', () => {
       nodeGpuMem.style.opacity = '0.15';
       nodeGpuMem.style.borderColor = 'var(--glass-border)';
       nodeOverarch.style.opacity = '1';
-      nodeOutputs.style.opacity = '1';
-      outputsLabel.textContent = 'Losses';
-      outputsLabel.style.color = 'var(--accent-orange)';
-      nodeOutputs.style.borderColor = 'rgba(251, 146, 60, 0.3)';
+      nodeLosses.style.opacity = '1';
+      nodePredictions.style.opacity = '0.05';
+      nodePredictions.style.borderColor = 'var(--glass-border)';
     } else if (phase === 'offline-prep') {
       nodeUserTower.style.opacity = '0.15';
       nodeObjectTower.style.opacity = '1';
       nodeGpuMem.style.opacity = '1';
       nodeGpuMem.style.borderColor = 'var(--accent-blue)';
       nodeOverarch.style.opacity = '0.15';
-      nodeOutputs.style.opacity = '0.15';
-      nodeOutputs.style.borderColor = 'var(--glass-border)';
+      nodeLosses.style.opacity = '0.05';
+      nodeLosses.style.borderColor = 'var(--glass-border)';
+      nodePredictions.style.opacity = '0.05';
+      nodePredictions.style.borderColor = 'var(--glass-border)';
     } else if (phase === 'online-scoring') {
       nodeUserTower.style.opacity = '1';
       nodeObjectTower.style.opacity = '0.15';
       nodeGpuMem.style.opacity = '1';
       nodeGpuMem.style.borderColor = 'var(--accent-blue)';
       nodeOverarch.style.opacity = '1';
-      nodeOutputs.style.opacity = '1';
-      outputsLabel.textContent = 'Predictions';
-      outputsLabel.style.color = 'var(--accent-orange)';
-      nodeOutputs.style.borderColor = 'rgba(251, 146, 60, 0.3)';
+      nodeLosses.style.opacity = '0.05';
+      nodeLosses.style.borderColor = 'var(--glass-border)';
+      nodePredictions.style.opacity = '1';
+      nodePredictions.style.borderColor = 'rgba(251, 146, 60, 0.3)';
     }
   }
 
   function resetNodeStyles() {
-    [nodeUserTower, nodeObjectTower, nodeGpuMem, nodeOverarch, nodeOutputs].forEach(node => {
+    [nodeUserTower, nodeObjectTower, nodeGpuMem, nodeOverarch, nodeLosses, nodePredictions].forEach(node => {
       if (node) {
         node.style.transition = 'opacity 0.4s ease, border-color 0.4s ease';
       }
@@ -350,7 +351,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const dy = endCenter.y - startCenter.y;
     
     archCtx.moveTo(startCenter.x, startCenter.y);
-    if (Math.abs(dy) > 5) {
+    if (Math.abs(dy) > 5 && Math.abs(dx) > 10) {
       archCtx.bezierCurveTo(
         startCenter.x + dx * 0.5, startCenter.y,
         startCenter.x + dx * 0.5, endCenter.y,
@@ -371,7 +372,7 @@ document.addEventListener('DOMContentLoaded', () => {
       archCtx.lineDashOffset = flowDirection === 1 ? -archDashOffset : archDashOffset;
       
       archCtx.beginPath();
-      if (Math.abs(dy) > 5) {
+      if (Math.abs(dy) > 5 && Math.abs(dx) > 10) {
         archCtx.moveTo(startCenter.x, startCenter.y);
         archCtx.bezierCurveTo(
           startCenter.x + dx * 0.5, startCenter.y,
@@ -392,7 +393,17 @@ document.addEventListener('DOMContentLoaded', () => {
     // Draw arrowhead at destination of flow
     const arrowDestX = flowDirection === 1 ? endCenter.x : startCenter.x;
     const arrowDestY = flowDirection === 1 ? endCenter.y : startCenter.y;
-    const arrowAngle = flowDirection === 1 ? 0 : Math.PI;
+    
+    let arrowAngle;
+    if (Math.abs(dy) > 5 && Math.abs(dx) > 10) {
+      // Bezier curve: ends horizontally
+      arrowAngle = flowDirection === 1 ? (dx > 0 ? 0 : Math.PI) : (dx > 0 ? Math.PI : 0);
+    } else {
+      // Straight line: compute geometric angle
+      const angle = Math.atan2(dy, dx);
+      arrowAngle = flowDirection === 1 ? angle : angle + Math.PI;
+    }
+    
     drawArrowhead(arrowDestX, arrowDestY, arrowAngle, 6, glowColor);
     
     // Reset shadow
@@ -413,7 +424,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const posObject = getElementCenter(nodeObjectTower);
     const posGpu = getElementCenter(nodeGpuMem);
     const posOver = getElementCenter(nodeOverarch);
-    const posOut = getElementCenter(nodeOutputs);
+    const posLosses = getElementCenter(nodeLosses);
+    const posPredictions = getElementCenter(nodePredictions);
     
     if (archPhase === 'training') {
       // 1. FORWARD PASS: Towers -> OverArch -> Losses
@@ -435,10 +447,10 @@ document.addEventListener('DOMContentLoaded', () => {
         true,
         1
       );
-      // OverArch -> Losses (offset top)
+      // OverArch -> Losses (vertical downward: offset left)
       drawConnection(
-        { x: posOver.x + posOver.width / 2, y: posOver.y - 10 },
-        { x: posOut.x - posOut.width / 2, y: posOut.y - 10 },
+        { x: posOver.x - 8, y: posOver.y + posOver.height / 2 },
+        { x: posLosses.x - 8, y: posLosses.y - posLosses.height / 2 },
         'rgba(251, 146, 60, 0.4)',
         'var(--accent-orange)',
         true,
@@ -446,10 +458,10 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       // 2. BACKWARD PASS (GRADIENTS): Losses -> OverArch -> Towers
-      // Losses -> OverArch (offset bottom)
+      // Losses -> OverArch (vertical upward: offset right)
       drawConnection(
-        { x: posOver.x + posOver.width / 2, y: posOver.y + 10 },
-        { x: posOut.x - posOut.width / 2, y: posOut.y + 10 },
+        { x: posOver.x + 8, y: posOver.y + posOver.height / 2 },
+        { x: posLosses.x + 8, y: posLosses.y - posLosses.height / 2 },
         'rgba(248, 113, 113, 0.45)',
         'var(--accent-red)',
         true,
@@ -505,7 +517,7 @@ document.addEventListener('DOMContentLoaded', () => {
       // OverArch -> Predictions
       drawConnection(
         { x: posOver.x + posOver.width / 2, y: posOver.y },
-        { x: posOut.x - posOut.width / 2, y: posOut.y },
+        { x: posPredictions.x - posPredictions.width / 2, y: posPredictions.y },
         'rgba(251, 146, 60, 0.4)',
         'var(--accent-orange)',
         true,
@@ -513,11 +525,11 @@ document.addEventListener('DOMContentLoaded', () => {
       );
 
       // Downstream arrow going right from Predictions
-      const startX = posOut.x + posOut.width / 2;
+      const startX = posPredictions.x + posPredictions.width / 2;
       const endX = startX + 25;
       drawConnection(
-        { x: startX, y: posOut.y },
-        { x: endX, y: posOut.y },
+        { x: startX, y: posPredictions.y },
+        { x: endX, y: posPredictions.y },
         'rgba(251, 146, 60, 0.4)',
         'var(--accent-orange)',
         true,
