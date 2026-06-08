@@ -211,37 +211,41 @@
               <div class="panel-content arch-visualizer-panel" style="position: relative; height: 320px; overflow: hidden; padding: 15px; display: flex; justify-content: center; align-items: center;">
                 <canvas id="arch-canvas" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none;"></canvas>
                 
-                <div class="arch-nodes-container" style="position: relative; width: 100%; height: 100%; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 0 10px;">
+                <div class="arch-nodes-container" style="position: relative; width: 100%; height: 100%; z-index: 2; display: flex; justify-content: space-between; align-items: center; padding: 0 5px;">
                   
-                  <!-- Left column: inputs / towers -->
-                  <div class="arch-col-left" style="display: flex; flex-direction: column; gap: 40px; align-items: flex-start; width: 120px;">
-                    <div class="arch-node" id="node-user-tower" style="background: rgba(167, 139, 250, 0.1); border: 1.5px solid var(--accent-purple); border-radius: 8px; padding: 10px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(167, 139, 250, 0.1); transition: all 0.3s ease;">
-                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">User Tower</div>
-                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-purple);">User MLP</div>
+                  <!-- Column 1: Towers -->
+                  <div class="arch-col-1" style="display: flex; flex-direction: column; gap: 40px; align-items: center; width: 95px;">
+                    <div class="arch-node" id="node-user-tower" style="background: rgba(167, 139, 250, 0.08); border: 1.5px solid var(--accent-purple); border-radius: 8px; padding: 8px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(167, 139, 250, 0.1); transition: all 0.3s ease;">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">User Tower</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-purple);">User MLP</div>
                     </div>
-                    <div class="arch-node" id="node-object-tower" style="background: rgba(45, 212, 191, 0.1); border: 1.5px solid var(--accent-teal); border-radius: 8px; padding: 10px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(45, 212, 191, 0.1); transition: all 0.3s ease;">
-                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Object Tower</div>
-                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-teal);">Object MLP</div>
-                    </div>
-                  </div>
-
-                  <!-- Middle column: intermediate storage / embeddings -->
-                  <div class="arch-col-middle" style="display: flex; flex-direction: column; gap: 40px; align-items: center; width: 120px; position: relative;">
-                    <div class="arch-node" id="node-gpu-mem" style="background: rgba(56, 189, 248, 0.05); border: 1.5px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(56, 189, 248, 0.05);">
-                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">GPU HBM</div>
-                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-blue);">Embeddings</div>
+                    <div class="arch-node" id="node-object-tower" style="background: rgba(45, 212, 191, 0.08); border: 1.5px solid var(--accent-teal); border-radius: 8px; padding: 8px; width: 100%; text-align: center; box-shadow: 0 0 10px rgba(45, 212, 191, 0.1); transition: all 0.3s ease;">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Object Tower</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-teal);">Object MLP</div>
                     </div>
                   </div>
 
-                  <!-- Right column: OverArch / predictions -->
-                  <div class="arch-col-right" style="display: flex; flex-direction: column; gap: 40px; align-items: flex-end; width: 120px;">
-                    <div class="arch-node" id="node-overarch" style="background: rgba(248, 250, 252, 0.03); border: 1.5px solid var(--glass-border); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease;">
-                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Scoring</div>
-                      <div style="font-size: 11px; font-weight: bold; color: var(--text-primary);">OverArch</div>
+                  <!-- Column 2: Storage -->
+                  <div class="arch-col-2" style="display: flex; justify-content: center; align-items: center; width: 90px;">
+                    <div class="arch-node" id="node-gpu-mem" style="background: rgba(56, 189, 248, 0.05); border: 1.5px solid rgba(56, 189, 248, 0.3); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(56, 189, 248, 0.05);">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">GPU HBM</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-blue);">Embeddings</div>
                     </div>
-                    <div class="arch-node" id="node-outputs" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 10px; width: 100%; text-align: center; transition: all 0.3s ease;">
-                      <div style="font-size: 10px; color: var(--text-secondary); margin-bottom: 2px;">Target</div>
-                      <div style="font-size: 11px; font-weight: bold; color: var(--accent-orange);" id="outputs-label">Losses</div>
+                  </div>
+
+                  <!-- Column 3: Computation -->
+                  <div class="arch-col-3" style="display: flex; justify-content: center; align-items: center; width: 95px;">
+                    <div class="arch-node" id="node-overarch" style="background: rgba(248, 250, 252, 0.03); border: 1.5px solid var(--glass-border); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease;">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Scoring</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--text-primary);">OverArch</div>
+                    </div>
+                  </div>
+
+                  <!-- Column 4: Outputs -->
+                  <div class="arch-col-4" style="display: flex; justify-content: center; align-items: center; width: 95px;">
+                    <div class="arch-node" id="node-outputs" style="background: rgba(251, 146, 60, 0.05); border: 1.5px solid rgba(251, 146, 60, 0.3); border-radius: 8px; padding: 8px; width: 100%; text-align: center; transition: all 0.3s ease;">
+                      <div style="font-size: 9px; color: var(--text-secondary); margin-bottom: 2px;">Target</div>
+                      <div style="font-size: 10px; font-weight: bold; color: var(--accent-orange);" id="outputs-label">Losses</div>
                     </div>
                   </div>
 

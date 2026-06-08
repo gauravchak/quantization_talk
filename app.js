@@ -324,7 +324,19 @@ document.addEventListener('DOMContentLoaded', () => {
     };
   }
 
-  function drawConnection(startCenter, endCenter, color, glowColor, showFlow = true) {
+  function drawArrowhead(x, y, angle, size, color) {
+    if (!archCtx) return;
+    archCtx.shadowBlur = 0; // reset shadow for arrowhead
+    archCtx.fillStyle = color;
+    archCtx.beginPath();
+    archCtx.moveTo(x, y);
+    archCtx.lineTo(x - size * Math.cos(angle - Math.PI / 6), y - size * Math.sin(angle - Math.PI / 6));
+    archCtx.lineTo(x - size * Math.cos(angle + Math.PI / 6), y - size * Math.sin(angle + Math.PI / 6));
+    archCtx.closePath();
+    archCtx.fill();
+  }
+
+  function drawConnection(startCenter, endCenter, color, glowColor, showFlow = true, flowDirection = 1) {
     if (!archCtx) return;
     
     // Draw background shadow glow line
@@ -356,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
       archCtx.strokeStyle = '#ffffff';
       archCtx.lineWidth = 3;
       archCtx.setLineDash([8, 15]);
-      archCtx.lineDashOffset = -archDashOffset;
+      archCtx.lineDashOffset = flowDirection === 1 ? -archDashOffset : archDashOffset;
       
       archCtx.beginPath();
       if (Math.abs(dy) > 5) {
@@ -376,6 +388,12 @@ document.addEventListener('DOMContentLoaded', () => {
       archCtx.setLineDash([]);
       archCtx.lineDashOffset = 0;
     }
+    
+    // Draw arrowhead at destination of flow
+    const arrowDestX = flowDirection === 1 ? endCenter.x : startCenter.x;
+    const arrowDestY = flowDirection === 1 ? endCenter.y : startCenter.y;
+    const arrowAngle = flowDirection === 1 ? 0 : Math.PI;
+    drawArrowhead(arrowDestX, arrowDestY, arrowAngle, 6, glowColor);
     
     // Reset shadow
     archCtx.shadowBlur = 0;
@@ -398,63 +416,112 @@ document.addEventListener('DOMContentLoaded', () => {
     const posOut = getElementCenter(nodeOutputs);
     
     if (archPhase === 'training') {
-      // Draw User Tower -> OverArch
+      // 1. FORWARD PASS: Towers -> OverArch -> Losses
+      // User Tower -> OverArch (offset top-left)
       drawConnection(
-        { x: posUser.x + posUser.width / 2, y: posUser.y },
-        { x: posOver.x - posOver.width / 2, y: posOver.y - 15 },
+        { x: posUser.x + posUser.width / 2, y: posUser.y - 8 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y - 12 },
         'rgba(167, 139, 250, 0.4)',
         'var(--accent-purple)',
-        true
+        true,
+        1
       );
-      // Draw Object Tower -> OverArch
+      // Object Tower -> OverArch (offset bottom-left)
       drawConnection(
-        { x: posObject.x + posObject.width / 2, y: posObject.y },
-        { x: posOver.x - posOver.width / 2, y: posOver.y + 15 },
+        { x: posObject.x + posObject.width / 2, y: posObject.y + 8 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y + 12 },
         'rgba(45, 212, 191, 0.4)',
         'var(--accent-teal)',
-        true
+        true,
+        1
       );
-      // Draw OverArch -> Losses
+      // OverArch -> Losses (offset top)
       drawConnection(
-        { x: posOver.x + posOver.width / 2, y: posOver.y },
-        { x: posOut.x - posOut.width / 2, y: posOut.y },
+        { x: posOver.x + posOver.width / 2, y: posOver.y - 10 },
+        { x: posOut.x - posOut.width / 2, y: posOut.y - 10 },
         'rgba(251, 146, 60, 0.4)',
         'var(--accent-orange)',
-        true
+        true,
+        1
+      );
+
+      // 2. BACKWARD PASS (GRADIENTS): Losses -> OverArch -> Towers
+      // Losses -> OverArch (offset bottom)
+      drawConnection(
+        { x: posOver.x + posOver.width / 2, y: posOver.y + 10 },
+        { x: posOut.x - posOut.width / 2, y: posOut.y + 10 },
+        'rgba(248, 113, 113, 0.45)',
+        'var(--accent-red)',
+        true,
+        -1
+      );
+      // OverArch -> User Tower (offset bottom-left of User Tower)
+      drawConnection(
+        { x: posUser.x + posUser.width / 2, y: posUser.y + 8 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y - 4 },
+        'rgba(248, 113, 113, 0.45)',
+        'var(--accent-red)',
+        true,
+        -1
+      );
+      // OverArch -> Object Tower (offset top-left of Object Tower)
+      drawConnection(
+        { x: posObject.x + posObject.width / 2, y: posObject.y - 8 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y + 4 },
+        'rgba(248, 113, 113, 0.45)',
+        'var(--accent-red)',
+        true,
+        -1
       );
     } else if (archPhase === 'offline-prep') {
-      // Draw Object Tower -> GPU Memory
+      // Object Tower -> GPU Memory
       drawConnection(
         { x: posObject.x + posObject.width / 2, y: posObject.y },
         { x: posGpu.x - posGpu.width / 2, y: posGpu.y },
         'rgba(45, 212, 191, 0.4)',
         'var(--accent-teal)',
-        true
+        true,
+        1
       );
     } else if (archPhase === 'online-scoring') {
-      // Draw User Tower -> OverArch
+      // User Tower -> OverArch (offset top-left)
       drawConnection(
         { x: posUser.x + posUser.width / 2, y: posUser.y },
-        { x: posOver.x - posOver.width / 2, y: posOver.y - 15 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y - 12 },
         'rgba(167, 139, 250, 0.4)',
         'var(--accent-purple)',
-        true
+        true,
+        1
       );
-      // Draw GPU Memory -> OverArch
+      // GPU Memory -> OverArch (offset bottom-left)
       drawConnection(
         { x: posGpu.x + posGpu.width / 2, y: posGpu.y },
-        { x: posOver.x - posOver.width / 2, y: posOver.y + 15 },
+        { x: posOver.x - posOver.width / 2, y: posOver.y + 12 },
         'rgba(56, 189, 248, 0.4)',
         'var(--accent-blue)',
-        true
+        true,
+        1
       );
-      // Draw OverArch -> Predictions
+      // OverArch -> Predictions
       drawConnection(
         { x: posOver.x + posOver.width / 2, y: posOver.y },
         { x: posOut.x - posOut.width / 2, y: posOut.y },
         'rgba(251, 146, 60, 0.4)',
         'var(--accent-orange)',
-        true
+        true,
+        1
+      );
+
+      // Downstream arrow going right from Predictions
+      const startX = posOut.x + posOut.width / 2;
+      const endX = startX + 25;
+      drawConnection(
+        { x: startX, y: posOut.y },
+        { x: endX, y: posOut.y },
+        'rgba(251, 146, 60, 0.4)',
+        'var(--accent-orange)',
+        true,
+        1
       );
     }
   }
