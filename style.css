@@ -1259,6 +1259,10 @@ table.comp-table td.strong {
     letter-spacing: 0.2px;
   }
 
+  .logo-prefix {
+    display: none;
+  }
+
   /* Progress Bar */
   .progress-container {
     gap: 8px;
